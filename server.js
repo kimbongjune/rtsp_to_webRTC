@@ -15,14 +15,17 @@
  *
  */
 
-var path = require('path');
-var url = require('url');
-var express = require('express');
-var minimist = require('minimist');
-var ws = require('ws');
-var kurento = require('kurento-client');
+const path = require('path');
+const { URL } = require('url');
+const express = require('express');
+const minimist = require('minimist');
+const ws = require('ws');
+const kurento = require('kurento-client');
 const bodyParser = require('body-parser');
 const { sequelize, rtspTable, Op } = require('./db/db');
+const axios = require('axios');
+const cors = require('cors');
+const net = require('net');
 
 var argv = minimist(process.argv.slice(2), {
     default: {
@@ -33,6 +36,8 @@ var argv = minimist(process.argv.slice(2), {
 
 var app = express();
 app.use(bodyParser.json());
+app.use(cors());
+app.use(express.static(path.join(__dirname, 'static')));
 
 /*
  * Definition of global variables.
@@ -41,6 +46,54 @@ var idCounter = 0;
 var candidatesQueue = {};
 var kurentoClient = null;
 var viewers = [];
+
+const checkTCPConnection = (ip, port) => {
+    return new Promise((resolve) => {
+        const client = new net.Socket();
+
+        client.connect(port, ip, () => {
+            resolve({ ip, port, status: 'open', isOpen : true });
+            client.destroy();
+        });
+
+        client.on('error', () => {
+            resolve({ ip, port, status: 'closed', isOpen : false });
+            client.destroy();
+        });
+
+        client.setTimeout(1000, () => {
+            resolve({ ip, port, status: 'closed', isOpen : false });
+            client.destroy();
+        });
+    });
+}
+
+
+// const tcp_ip = '210.99.70.120';
+// const tcp_port = 1935;
+
+// checkTCPConnection(tcp_ip, tcp_port).then((result) => {
+//     if (result.isOpen) {
+//         console.log('서버 열려 있음');
+//     } else {
+//         console.log('서버 닫혀 있음');
+//     }
+// }).catch(() => {
+//     console.log('서버 닫혀 있음');
+// });
+
+const addresses = [
+    { ip: '210.99.70.120', port: 1935 },
+    { ip: '210.99.70.120', port: 1935 },
+];
+
+Promise.all(addresses.map(addr => checkTCPConnection(addr.ip, addr.port)))
+    .then((results) => {
+        //console.log(results);
+        results.forEach(result => {
+            console.log(`${result.ip}:${result.port} is ${result.status}, open = ${result.isOpen}`);
+        });
+    });
 
 app.post('/health', async (req, res) => {
     const dataArray = req.body.carId || [];
@@ -56,7 +109,7 @@ app.post('/health', async (req, res) => {
 
         //TODO 반환된 url을 이용해 restapi를 요청하고 응답값에 따라 헬스 체크 상태를 반환한다.
         results.filter(data => data.streaming_url !== undefined).forEach(data => console.log(data.streaming_url));
-
+        
         res.json(results);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -66,9 +119,8 @@ app.post('/health', async (req, res) => {
 /*
  * Server startup
  */
-var asUrl = url.parse(argv.as_uri);
+const asUrl = new URL(argv.as_uri);
 var port = asUrl.port;
-var server;
 
 sequelize.sync()
     .then(() => {
@@ -80,12 +132,22 @@ sequelize.sync()
 
 var server = app.listen(port, function() {
     console.log('Kurento Tutorial started');
-    console.log('Open ' + url.format(asUrl) + ' with a WebRTC capable browser');
+    console.log('Open ' + asUrl + ' with a WebRTC capable browser');
 });
 
 var wss = new ws.Server({
     server : server,
-    path : '/rtsp'
+    path : '/rtsp',
+    verifyClient : (info, done) => {
+        const origin = info.origin;
+        const allowedOrigins = ["*"];
+
+        if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+            done(true);
+        } else {
+            done(false, 403, "CORS not allowed");
+        }
+    }
 });
 
 function nextUniqueId() {
@@ -305,5 +367,3 @@ function onIceCandidate(sessionId, _candidate) {
         candidatesQueue[sessionId].push(candidate);
     }
 }
-
-app.use(express.static(path.join(__dirname, 'static')));

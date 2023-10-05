@@ -6,7 +6,9 @@
     "postinstall": "cd static && bower install"
   },
   "dependencies": {
+    "axios": "^1.5.1",
     "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
     "express": "^4.17.0",
     "fluent-ffmpeg": "^2.1.2",
     "kurento-client": "git+https://github.com/Kurento/kurento-client-js.git",

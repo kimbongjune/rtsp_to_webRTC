@@ -15,14 +15,14 @@
  *
  */
 
-var ws = new WebSocket('ws://' + location.host + '/rtsp');
-var video;
-var webRtcPeer;
+const ws = new WebSocket('ws://' + location.host + '/rtsp');
+let video;
+let webRtcPeer;
 let rtspUrl = '';
 let mediaRecorder;
 let recordedChunks = [];
 
-window.onload = function() {
+window.onload = () => {
 	console = new Console();
 	video = document.getElementById('video');
 	const startRecordButton = document.getElementById('recoding');
@@ -44,56 +44,14 @@ window.onload = function() {
 	// 	}
 	// 	sendMessage(message);
 	// });
-
-	// startRecordButton.addEventListener('click', function() {
-	// 	mediaRecorder = new MediaRecorder(video.srcObject);
-	// 	mediaRecorder.ondataavailable = handleDataAvailable;
-	// 	mediaRecorder.start();
-	// });
-
-	// stopRecordButton.addEventListener('click', function() {
-	// 	mediaRecorder?.stop();
-	// });
-
-	function handleDataAvailable(event) {
-		if (event.data.size > 0) {
-			recordedChunks.push(event.data);
-			downloadLink.href = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
-		}
-	}
-
-	function handleDataAvailable(event) {
-		if (event.data.size > 0) {
-			recordedChunks.push(event.data);
-			mediaRecorder.onstop = () => {
-				const blob = new Blob(recordedChunks, { type: 'video/webm' });
-				const url = URL.createObjectURL(blob);
-				const a = document.createElement('a');
-				a.style.display = 'none';
-				a.href = url;
-				a.download = `recode_${getCurrentDateString()}.webm`;
-				document.body.appendChild(a);
-				a.click();
-				setTimeout(() => {
-					document.body.removeChild(a);
-					window.URL.revokeObjectURL(url);
-				}, 100);
-			}
-		}
-	}
-	function getCurrentDateString() {
-		const now = new Date();
-		return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-	}
 }
 
-
-window.onbeforeunload = function() {
+window.onbeforeunload = () => {
 	ws.close();
 }
 
-ws.onmessage = function(message) {
-	var parsedMessage = JSON.parse(message.data);
+ws.onmessage = (message) =>{
+	const parsedMessage = JSON.parse(message.data);
 	console.info('Received message: ' + message.data);
 
 	switch (parsedMessage.id) {
@@ -111,9 +69,9 @@ ws.onmessage = function(message) {
 	}
 }
 
-function viewerResponse(message) {
+const viewerResponse = (message) => {
 	if (message.response != 'accepted') {
-		var errorMsg = message.message ? message.message : 'Unknow error';
+		const errorMsg = message.message ? message.message : 'Unknow error';
 		console.warn('Call not accepted for the following reason: ' + errorMsg);
 		dispose();
 	} else {
@@ -121,7 +79,7 @@ function viewerResponse(message) {
 	}
 }
 
-function viewer() {
+const viewer = () => {
 	rtspUrl = document.getElementById("rtsp-url").value
 	if(!rtspUrl){
 		alert('Please enter a valid RTSP URL');
@@ -130,7 +88,7 @@ function viewer() {
 	if (!webRtcPeer) {
 		showSpinner(video);
 
-		var options = {
+		const options = {
 			remoteVideo: video,
 			onicecandidate : onIceCandidate
 		}
@@ -143,10 +101,10 @@ function viewer() {
 	}
 }
 
-function onOfferViewer(error, offerSdp) {
+const onOfferViewer = (error, offerSdp) => {
 	if (error) return onError(error)
 
-	var message = {
+	const message = {
 		id : 'viewer',
 		sdpOffer : offerSdp,
 		rtspUrl : rtspUrl
@@ -154,28 +112,28 @@ function onOfferViewer(error, offerSdp) {
 	sendMessage(message);
 }
 
-function onIceCandidate(candidate) {
+const onIceCandidate = (candidate) => {
 	   console.log('Local candidate' + JSON.stringify(candidate));
 
-	   var message = {
+	   const message = {
 	      id : 'onIceCandidate',
 	      candidate : candidate
 	   }
 	   sendMessage(message);
 }
 
-function stop() {
+const stop = () => {
 	mediaRecorder?.stop();
 	if (webRtcPeer) {
-		var message = {
-				id : 'stop'
+		const message = {
+			id : 'stop'
 		}
 		sendMessage(message);
 		dispose();
 	}
 }
 
-function dispose() {
+const dispose = () => {
 	if (webRtcPeer) {
 		webRtcPeer.dispose();
 		webRtcPeer = null;
@@ -183,30 +141,27 @@ function dispose() {
 	hideSpinner(video);
 }
 
-function sendMessage(message) {
-	var jsonMessage = JSON.stringify(message);
+const sendMessage = (message) => {
+	const jsonMessage = JSON.stringify(message);
 	console.log('Sending message: ' + jsonMessage);
 	ws.send(jsonMessage);
 }
 
-function showSpinner() {
-	for (var i = 0; i < arguments.length; i++) {
+const showSpinner = (...arguments) => {
+	for (let i = 0; i < arguments.length; i++) {
 		arguments[i].poster = './img/transparent-1px.png';
 		arguments[i].style.background = 'center transparent url("./img/spinner.gif") no-repeat';
 	}
 }
 
-function hideSpinner() {
-	for (var i = 0; i < arguments.length; i++) {
+const hideSpinner = (...arguments) => {
+	for (let i = 0; i < arguments.length; i++) {
 		arguments[i].src = '';
 		arguments[i].style.background = '';
 	}
 }
 
-/**
- * Lightbox utility (to display media pipeline image in a modal dialog)
- */
-$(document).delegate('*[data-toggle="lightbox"]', 'click', function(event) {
-	event.preventDefault();
-	$(this).ekkoLightbox();
-});
+const onError = (error) => {
+	console.error(error)
+	alert("error: ", error)
+}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <script src="bower_components/jquery/dist/jquery.min.js"></script>
+    <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+    
+    <link href="https://cdn.datatables.net/v/bs5/jq-3.7.0/dt-1.13.6/datatables.min.css" rel="stylesheet">
+ 
+    <link href="https://cdn.datatables.net/plug-ins/1.13.6/features/searchHighlight/dataTables.searchHighlight.css" rel="stylesheet">
+    <script src="https://cdn.datatables.net/v/bs5/jq-3.7.0/dt-1.13.6/datatables.min.js"></script>
+    <script src="https://bartaz.github.io/sandbox.js/jquery.highlight.js"></script>
+    <script src="https://cdn.datatables.net/plug-ins/1.13.6/features/searchHighlight/dataTables.searchHighlight.min.js"></script>
+    <script src="bower_components/axios/dist/axios.js"></script>
+</head>
+<body>
+    <table id="rtsp_table" class="table table-striped" style="width:100%">
+        <thead>
+            <tr>
+                <th>무선호출명</th>
+                <th>차량번호</th>
+                <th>rtsp 주소</th>
+                <th>rtsp 아이디</th>
+                <th>rtsp 비밀번호</th>
+                <th>생성일</th>
+                <th>수정일</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</body>
+<script>
+$(document).ready(async function () {
+    await axios.get('/rtsp-list')
+        .then(function(response) {
+            // 여기에서 response.data를 처리합니다.
+            const rtspData = response.data;
+            const tableBody = document.getElementById('rtsp_table').getElementsByTagName('tbody')[0];
+                rtspData.forEach(item => {
+                const row = tableBody.insertRow();
+
+                const cell1 = row.insertCell(0);
+                const cell2 = row.insertCell(1);
+                const cell3 = row.insertCell(2);
+                const cell4 = row.insertCell(3);
+                const cell5 = row.insertCell(4);
+                const cell6 = row.insertCell(5);
+                const cell7 = row.insertCell(6);
+
+                cell1.innerText = item.streaming_name;
+                cell2.innerText = item.streaming_car_id;
+                cell3.innerText = item.streaming_url;
+                cell4.innerText = item.streaming_id;
+                cell5.innerText = item.streaming_password;
+                cell6.innerText = item.createdAt;
+                cell7.innerText = item.updatedAt;
+            });
+
+            var table = $('#rtsp_table').DataTable({
+                pagingType: 'full_numbers',
+                "language": {
+                    "search" : "검색",
+                    "info" : "총 _TOTAL_개 중 _START_ ~ _END_번째 항목 표시",
+                    "infoEmpty" : "총 0개 중 0 - 0번째 항목 표시",
+                    "lengthMenu" : "_MENU_개씩 보기",
+                    "paginate" : {
+                        "first" : "첫 페이지",
+                        "last" : "마지막 페이지",
+                        "next" : "다음 페이지",
+                        "previous" : "이전 페이지"
+                    },
+                    "zeroRecords" : "검색결과가 없습니다.",
+                    "infoFiltered" : "(총 _MAX_ 개 항목중 필터링됨)",
+                }
+            });
+
+            table.on('draw', function () {
+                var body = $( table.table().body() );
+
+                body.unhighlight();
+                body.highlight( table.search() );  
+            });
+        })
+        .catch(function(error) {
+            console.error("Error fetching rtsp list:", error);
+        });
+});
+</script>
+</html>

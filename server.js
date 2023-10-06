@@ -150,6 +150,22 @@ var wss = new ws.Server({
     }
 });
 
+app.get('/manage', (req, res) => {
+    res.sendFile(path.join(__dirname, 'static', 'board.html'));
+});
+
+app.get('/rtsp-list', async (req, res) => {
+    try {
+        const results = await rtspTable.findAll();
+        //console.log(results);
+        res.json(results);
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        res.json(error);
+    }
+});
+
+
 function nextUniqueId() {
 	idCounter++;
 	return idCounter.toString();
@@ -164,18 +180,18 @@ wss.on('connection', function(ws) {
 	console.log('Connection received with sessionId ' + sessionId);
 
     ws.on('error', function(error) {
-        console.log('Connection ' + sessionId + ' error');
+        //console.log('Connection ' + sessionId + ' error');
         stop(sessionId);
     });
 
     ws.on('close', function() {
-        console.log('Connection ' + sessionId + ' closed');
+        //console.log('Connection ' + sessionId + ' closed');
         stop(sessionId);
     });
 
     ws.on('message', function(_message) {
         var message = JSON.parse(_message);
-        console.log('Connection ' + sessionId + ' received message ', message);
+        //console.log('Connection ' + sessionId + ' received message ', message);
 
         switch (message.id) {
         case 'viewer':
@@ -249,10 +265,10 @@ function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
 
         kurentoClient.create('MediaPipeline', function(error, pipeline) {
             if (error) {
+                stop(sessionId);
                 return callback(error);
             }
 
-            // PlayerEndpoint 생성
             pipeline.create('PlayerEndpoint', {uri: rtspUri}, function(error, player) {
                 if (error) {
                     stop(sessionId);
@@ -265,65 +281,101 @@ function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                         return callback(error);
                     }
 
-                    webRtcEndpoint.setMaxVideoSendBandwidth(2000);
-                    webRtcEndpoint.setMinVideoSendBandwidth(500);
-
-                    webRtcEndpoint.setMaxVideoRecvBandwidth(2000);
-                    webRtcEndpoint.setMinVideoRecvBandwidth(500);
-
-                    viewers[sessionId] = {
-                        webRtcEndpoint: webRtcEndpoint,
-                        ws: ws
-                    }
-
-                    if (candidatesQueue[sessionId]) {
-                        while (candidatesQueue[sessionId].length) {
-                            var candidate = candidatesQueue[sessionId].shift();
-                            webRtcEndpoint.addIceCandidate(candidate);
-                        }
-                    }
-
-                    webRtcEndpoint.on("MediaStateChanged", function(event) {
-                        console.log("MediaStateChanged",event)
-                    });
-
-                    webRtcEndpoint.on('IceCandidateFound', function(event) {
-                        var candidate = kurento.getComplexType('IceCandidate')(event.candidate);
-                        ws.send(JSON.stringify({
-                            id: 'iceCandidate',
-                            candidate: candidate
-                        }));
-                    });
-
-                    webRtcEndpoint.processOffer(sdpOffer, function(error, sdpAnswer) {
+                    const recordUri = `file:///recorders/${getFormattedDate()}_재난번호_차량번호_${sessionId}.webm`;
+                    pipeline.create('RecorderEndpoint', {uri: recordUri, mediaProfile: 'WEBM_VIDEO_ONLY'}, function(error, recorder) {
                         if (error) {
                             stop(sessionId);
                             return callback(error);
                         }
 
-                        // RTSP 스트림 (playerEndpoint)를 WebRTC 스트림 (webRtcEndpoint)에 연결
-                        player.connect(webRtcEndpoint, function(error) {
+                        viewers[sessionId] = {
+                            webRtcEndpoint: webRtcEndpoint,
+                            ws: ws,
+                            recorder : recorder
+                        };
+
+                        player.connect(recorder, function(error) {
+                            if (error) {
+                                stop(sessionId);
+                                return callback(error);
+                            }
+                            console.log("Connected WebRtcEndpoint to RecorderEndpoint successfully");
+                        })
+
+                        webRtcEndpoint.setMaxVideoSendBandwidth(2000);
+                        webRtcEndpoint.setMinVideoSendBandwidth(500);
+                        webRtcEndpoint.setMaxVideoRecvBandwidth(2000);
+                        webRtcEndpoint.setMinVideoRecvBandwidth(500);
+
+                        if (candidatesQueue[sessionId]) {
+                            while (candidatesQueue[sessionId].length) {
+                                var candidate = candidatesQueue[sessionId].shift();
+                                webRtcEndpoint.addIceCandidate(candidate);
+                            }
+                        }
+
+                        recorder.on("Recording", function(event){
+                            console.log("Recording",event)
+                        })
+
+                        recorder.on("Paused", function(event){
+                            console.log("Paused",event)
+                        })
+
+                        recorder.on("Stopped", function(event){
+                            console.log("Paused",event)
+                        })
+
+                        webRtcEndpoint.on("MediaStateChanged", function(event) {
+                            console.log("MediaStateChanged",event)
+                            if ((event.oldState !== event.newState) && (event.newState === 'CONNECTED')) {
+                                recorder.record(function(error) {
+                                    if (error) {
+                                        stop(sessionId);
+                                        return callback(error);
+                                    }
+                                });
+                                console.log("Recording started successfully");
+                            }
+                        });
+
+                        webRtcEndpoint.on('IceCandidateFound', function(event) {
+                            var candidate = kurento.getComplexType('IceCandidate')(event.candidate);
+                            ws.send(JSON.stringify({
+                                id: 'iceCandidate',
+                                candidate: candidate
+                            }));
+                        });
+
+	                    webRtcEndpoint.processOffer(sdpOffer, function(error, sdpAnswer) {
                             if (error) {
                                 stop(sessionId);
                                 return callback(error);
                             }
 
-                            player.play(function(error) {
+                            player.connect(webRtcEndpoint, function(error) {
                                 if (error) {
                                     stop(sessionId);
                                     return callback(error);
                                 }
 
-                                callback(null, sdpAnswer);
+                                player.play(function(error) {
+                                    if (error) {
+                                        stop(sessionId);
+                                        return callback(error);
+                                    }
+
+                                    callback(null, sdpAnswer);
+                                });
                             });
                         });
-                    });
 
-                    webRtcEndpoint.gatherCandidates(function(error) {
-                        if (error) {
-                            stop(sessionId);
-                            return callback(error);
-                        }
+                        webRtcEndpoint.gatherCandidates(function(error) {
+                            if (error) {
+                                stop(sessionId);
+                                return callback(error);
+                            }
+                        });
                     });
                 });
             });
@@ -332,20 +384,23 @@ function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
 }
 
 function clearCandidatesQueue(sessionId) {
-	if (candidatesQueue[sessionId]) {
-		delete candidatesQueue[sessionId];
-	}
+  if (candidatesQueue[sessionId]) {
+    delete candidatesQueue[sessionId];
+  }
 }
 
 function stop(sessionId) {
-	if (viewers[sessionId]) {
-		viewers[sessionId].webRtcEndpoint.release();
-		delete viewers[sessionId];
-	}
+console.log("Stopping recorder for session:", sessionId);
+  if (viewers[sessionId]) {
+        viewers[sessionId].recorder.stop();
+        viewers[sessionId].recorder.release();
+        viewers[sessionId].webRtcEndpoint.release();
+        delete viewers[sessionId];
+  }
 
-	clearCandidatesQueue(sessionId);
+  clearCandidatesQueue(sessionId);
 
-	if (viewers.length < 1) {
+  if (viewers.length < 1) {
         console.log('Closing kurento client');
         kurentoClient?.close();
         kurentoClient = null;
@@ -356,14 +411,27 @@ function onIceCandidate(sessionId, _candidate) {
     var candidate = kurento.getComplexType('IceCandidate')(_candidate);
 
     if (viewers[sessionId] && viewers[sessionId].webRtcEndpoint) {
-        console.info('Sending viewer candidate');
+        //console.info('Sending viewer candidate');
         viewers[sessionId].webRtcEndpoint.addIceCandidate(candidate);
     }
     else {
-        console.info('Queueing candidate');
+        //console.info('Queueing candidate');
         if (!candidatesQueue[sessionId]) {
             candidatesQueue[sessionId] = [];
         }
         candidatesQueue[sessionId].push(candidate);
     }
+}
+
+function getFormattedDate() {
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // 1~12
+    const day = String(currentDate.getDate()).padStart(2, '0'); // 1~31
+
+    const hours = String(currentDate.getHours()).padStart(2, '0');
+    const minutes = String(currentDate.getMinutes()).padStart(2, '0');
+    const seconds = String(currentDate.getSeconds()).padStart(2, '0');
+
+    return `${year}_${month}_${day}-${hours}_${minutes}_${seconds}`;
 }

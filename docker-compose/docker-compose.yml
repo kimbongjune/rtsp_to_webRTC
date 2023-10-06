@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  kurento:
+    image: preinstalled-curento-media-server:latest
+    ports:
+      - "8888:8888"
+    volumes:
+      - D:\vsCodeFile\rtsp_to_webRTC\static\recorers:/recorders
+
+  db:
+    image: mysql:latest
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: rtsp
+      MYSQL_ROOT_PASSWORD: qwer1234
+      TZ: Asia/Seoul
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:

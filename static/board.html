@@ -15,26 +15,176 @@
     <script src="https://bartaz.github.io/sandbox.js/jquery.highlight.js"></script>
     <script src="https://cdn.datatables.net/plug-ins/1.13.6/features/searchHighlight/dataTables.searchHighlight.min.js"></script>
     <script src="bower_components/axios/dist/axios.js"></script>
+    <style>
+        body{
+            padding: 1rem;
+        }
+        td.highlight {
+            background-color: whitesmoke !important;
+        }
+        
+        html.dark td.highlight {
+            background-color: rgba(var(--dt-row-hover), 0.082) !important;
+        }
+        .table thead th {
+            padding: 10px 8px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .table tbody td {
+            padding: 8px;
+        }
+
+        .table-bordered {
+            border: 1px solid #dee2e6;
+        }
+    </style>
 </head>
 <body>
+    <button type="button" class="btn btn-primary" id="rtspAddButton" data-bs-toggle="modal" data-bs-target="#rtspAddModal">
+        카메라 IP 정보 추가
+    </button>
+
+    <button type="button" class="btn btn-primary" id="rtspUpdateButton">
+        수정
+    </button>
+
+    <button type="button" class="btn btn-primary" id="rtspDeleteButton">
+        삭제
+    </button>
+
     <table id="rtsp_table" class="table table-striped" style="width:100%">
         <thead>
             <tr>
                 <th>무선호출명</th>
                 <th>차량번호</th>
-                <th>rtsp 주소</th>
-                <th>rtsp 아이디</th>
-                <th>rtsp 비밀번호</th>
+                <th>카메라 IP</th>
+                <th>카메라 ID</th>
+                <th>카메라 비밀번호</th>
                 <th>생성일</th>
                 <th>수정일</th>
             </tr>
         </thead>
         <tbody></tbody>
     </table>
+    <div class="modal fade" id="rtspAddModal" tabindex="-1" aria-labelledby="rtspAddModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"> <!-- 세로 중앙 배치 -->
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="rtspAddModalLabel">차량 카메라 정보 추가</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <!-- Form removed as per requirement -->
+                <div class="mb-3 row">
+                  <label for="streaming_name" class="col-sm-4 col-form-label">무선 호출명</label>
+                  <div class="col-sm-8">
+                    <input type="text" class="form-control" id="streaming_name">
+                  </div>
+                </div>
+                <div class="mb-3 row">
+                  <label for="streaming_car_id" class="col-sm-4 col-form-label">차량 번호</label>
+                  <div class="col-sm-8">
+                    <input type="text" class="form-control" id="streaming_car_id">
+                  </div>
+                </div>
+                <div class="mb-3 row">
+                  <label for="streaming_url" class="col-sm-4 col-form-label">카메라 IP</label>
+                  <div class="col-sm-8">
+                    <input type="text" class="form-control" id="streaming_url">
+                  </div>
+                </div>
+                <div class="mb-3 row">
+                    <label for="streaming_id" class="col-sm-4 col-form-label">카메라 ID</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" id="streaming_id">
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label for="streaming_password" class="col-sm-4 col-form-label">카메라 비밀번호</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" id="streaming_password">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+              <button type="button" class="btn btn-primary" id="add-rtsp-info">추가</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade" id="rtspModifyModal" tabindex="-1" aria-labelledby="rtspModifyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"> <!-- 세로 중앙 배치 -->
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="rtspModifyModalLabel">차량 카메라 정보 수정</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <!-- Form removed as per requirement -->
+                <div class="mb-3 row">
+                  <label for="streaming_name_modify" class="col-sm-4 col-form-label">무선 호출명</label>
+                  <div class="col-sm-8">
+                    <input type="text" class="form-control" id="streaming_name_modify" readonly>
+                  </div>
+                </div>
+                <div class="mb-3 row">
+                  <label for="streaming_car_id_modify" class="col-sm-4 col-form-label">차량 번호</label>
+                  <div class="col-sm-8">
+                    <input type="text" class="form-control" id="streaming_car_id_modify">
+                  </div>
+                </div>
+                <div class="mb-3 row">
+                  <label for="streaming_url_modify" class="col-sm-4 col-form-label">카메라 IP</label>
+                  <div class="col-sm-8">
+                    <input type="text" class="form-control" id="streaming_url_modify">
+                  </div>
+                </div>
+                <div class="mb-3 row">
+                    <label for="streaming_id_modify" class="col-sm-4 col-form-label">카메라 ID</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" id="streaming_id_modify">
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label for="streaming_password_modify" class="col-sm-4 col-form-label">카메라 비밀번호</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" id="streaming_password_modify">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+              <button type="button" class="btn btn-primary" id="modify-rtsp-info">수정</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade" id="rtspDeleteModal" tabindex="-1" aria-labelledby="rtspDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="rtspDeleteModalLabel">확인</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              선택한 데이터를 삭제하시겠습니까?
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancelBtn">취소</button>
+              <button type="button" class="btn btn-primary" id="delete-rtsp-info">확인</button>
+            </div>
+          </div>
+        </div>
+      </div>
 </body>
 <script>
 $(document).ready(async function () {
-    await axios.get('/rtsp-list')
+    let table
+    await axios.get('/rtsp-info')
         .then(function(response) {
             // 여기에서 response.data를 처리합니다.
             const rtspData = response.data;
@@ -59,7 +209,7 @@ $(document).ready(async function () {
                 cell7.innerText = item.updatedAt;
             });
 
-            var table = $('#rtsp_table').DataTable({
+            table = $('#rtsp_table').DataTable({
                 pagingType: 'full_numbers',
                 "language": {
                     "search" : "검색",
@@ -83,10 +233,190 @@ $(document).ready(async function () {
                 body.unhighlight();
                 body.highlight( table.search() );  
             });
+
+            table.on('mouseenter', 'td', function () {
+                let colIdx = table.cell(this).index().column;
+            
+                table
+                    .cells()
+                    .nodes()
+                    .each((el) => el.classList.remove('highlight'));
+            
+                table
+                    .column(colIdx)
+                    .nodes()
+                    .each((el) => el.classList.add('highlight'));
+            });
+
+            table.on('click', 'tbody tr', (e) => {
+                let classList = e.currentTarget.classList;
+            
+                if (classList.contains('selected')) {
+                    classList.remove('selected');
+                }
+                else {
+                    table.rows('.selected').nodes().each((row) => row.classList.remove('selected'));
+                    classList.add('selected');
+                }
+            });
         })
         .catch(function(error) {
             console.error("Error fetching rtsp list:", error);
         });
+
+        document.querySelector("#add-rtsp-info").addEventListener("click", async function() {
+            const streaming_name = document.getElementById("streaming_name");
+            const streaming_car_id = document.getElementById("streaming_car_id");
+            const streaming_url = document.getElementById("streaming_url");
+            const streaming_id = document.getElementById("streaming_id");
+            const streaming_password = document.getElementById("streaming_password");
+
+            // 입력값 유효성 검사 및 포커스 설정
+            const inputs = [streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password];
+            for(let input of inputs) {
+                if(!input.value) {
+                    alert("모든 필드를 채워주세요!");
+                    input.focus(); // 포커스 주기
+                    return;
+                }
+            }
+
+            const data = {
+                streaming_name: streaming_name.value,
+                streaming_car_id: streaming_car_id.value,
+                streaming_url: streaming_url.value,
+                streaming_id: streaming_id.value,
+                streaming_password: streaming_password.value
+            };
+
+            try {
+                const response = await axios.post("/rtsp-info", data);
+                console.log(response)
+                
+                if(response.status === 200) {
+                    // 모달 닫기
+                    var myModal = bootstrap.Modal.getInstance(document.getElementById('rtspAddModal'));
+                    myModal.hide();
+                    addNewRow(response.data.data)
+                    // 입력값 초기화
+                    inputs.forEach(input => input.value = '');
+                }
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        });
+
+        function addNewRow(data) {
+            table.row
+                .add([data.streaming_name, data.streaming_car_id, data.streaming_url, data.streaming_id, data.streaming_password, data.createdAt, data.updatedAt])
+                .draw(false);
+        }
+
+        function updateRow(data) {
+            const row = table.row('.selected');
+            const newData = [
+                data.streaming_name, 
+                data.streaming_car_id, 
+                data.streaming_url, 
+                data.streaming_id, 
+                data.streaming_password, 
+                data.createdAt, 
+                data.updatedAt
+            ];
+            
+            row.data(newData).draw();
+        }
+
+        document.getElementById("rtspDeleteButton").addEventListener("click", function(){
+            if(table.row('.selected').length <= 0){
+                return alert("행을 선택 후 삭제가 가능합니다.")
+            }
+            const confirmModal = new bootstrap.Modal(document.getElementById('rtspDeleteModal'));
+            confirmModal.show();
+        })
+
+        document.getElementById("rtspUpdateButton").addEventListener("click", function(){
+            if(table.row('.selected').length <= 0){
+                return alert("행을 선택 후 수정이 가능합니다.")
+            }
+
+            const streaming_name = document.getElementById("streaming_name_modify");
+            const streaming_car_id = document.getElementById("streaming_car_id_modify");
+            const streaming_url = document.getElementById("streaming_url_modify");
+            const streaming_id = document.getElementById("streaming_id_modify");
+            const streaming_password = document.getElementById("streaming_password_modify");
+
+            const data = table.row('.selected').data()
+
+            streaming_name.value = data[0]
+            streaming_car_id.value = data[1]
+            streaming_url.value = data[2]
+            streaming_id.value = data[3]
+            streaming_password.value = data[4]
+
+            const confirmModal = new bootstrap.Modal(document.getElementById('rtspModifyModal'));
+            confirmModal.show();
+        })
+
+        document.getElementById("modify-rtsp-info").addEventListener("click", async function(){
+            const streaming_name = document.getElementById("streaming_name_modify");
+            const streaming_car_id = document.getElementById("streaming_car_id_modify");
+            const streaming_url = document.getElementById("streaming_url_modify");
+            const streaming_id = document.getElementById("streaming_id_modify");
+            const streaming_password = document.getElementById("streaming_password_modify");
+
+            // 입력값 유효성 검사 및 포커스 설정
+            const inputs = [streaming_car_id, streaming_url, streaming_id, streaming_password];
+            for(let input of inputs) {
+                if(!input.value) {
+                    alert("모든 필드를 채워주세요!");
+                    input.focus(); // 포커스 주기
+                    return;
+                }
+            }
+
+            const data = {
+                streaming_name: streaming_name.value,
+                streaming_car_id: streaming_car_id.value,
+                streaming_url: streaming_url.value,
+                streaming_id: streaming_id.value,
+                streaming_password: streaming_password.value
+            };
+
+            try {
+                const response = await axios.put("/rtsp-info", data);
+                console.log(response)
+                
+                if(response.status === 200) {
+                    var myModal = bootstrap.Modal.getInstance(document.getElementById('rtspModifyModal'));
+                    myModal.hide();
+                    updateRow(response.data.data)
+                }
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        })
+
+        document.getElementById("delete-rtsp-info").addEventListener("click", async function(){
+            try {
+                const data = table.row('.selected').data()
+                console.log(data)
+                const response = await axios({
+                    method: 'DELETE',
+                    url: '/rtsp-info',
+                    data: { streaming_name: data[0] }
+                });
+                
+                if(response.status === 200) {
+                    // 모달 닫기
+                    table.row('.selected').remove().draw(false);
+                    var myModal = bootstrap.Modal.getInstance(document.getElementById('rtspDeleteModal'));
+                    myModal.hide();
+                }
+            } catch (error) {
+                console.error("Error:", error.response.data);
+            }
+        })
 });
 </script>
 </html>

@@ -15,7 +15,7 @@
  *
  */
 
-const ws = new WebSocket('ws://' + location.host + '/rtsp');
+let ws = new WebSocket('ws://' + location.host + '/rtsp');
 let video;
 let webRtcPeer;
 let rtspUrl = '';
@@ -47,7 +47,11 @@ window.onload = () => {
 }
 
 window.onbeforeunload = () => {
-	ws.close();
+	stop();
+}
+
+ws.onclose = (event) => {
+	
 }
 
 ws.onmessage = (message) =>{
@@ -80,6 +84,9 @@ const viewerResponse = (message) => {
 }
 
 const viewer = () => {
+	if (!ws) {
+		ws = new WebSocket('ws://' + location.host + '/rtsp');
+	}
 	rtspUrl = document.getElementById("rtsp-url").value
 	if(!rtspUrl){
 		alert('Please enter a valid RTSP URL');
@@ -123,6 +130,7 @@ const onIceCandidate = (candidate) => {
 }
 
 const stop = () => {
+	console.log("stop")
 	mediaRecorder?.stop();
 	if (webRtcPeer) {
 		const message = {

@@ -154,7 +154,7 @@ app.get('/manage', (req, res) => {
     res.sendFile(path.join(__dirname, 'static', 'board.html'));
 });
 
-app.get('/rtsp-list', async (req, res) => {
+app.get('/rtsp-info', async (req, res) => {
     try {
         const results = await rtspTable.findAll();
         //console.log(results);
@@ -165,6 +165,59 @@ app.get('/rtsp-list', async (req, res) => {
     }
 });
 
+app.post('/rtsp-info', async (req, res) => {
+    try {
+        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password } = req.body;
+        console.log(req.body)
+        const createdData = await rtspTable.create({
+            streaming_name: streaming_name,
+            streaming_car_id: streaming_car_id,
+            streaming_url: streaming_url,
+            streaming_id: streaming_id,
+            streaming_password: streaming_password
+        });
+        res.status(200).json({ message: "Data inserted successfully", data:createdData });
+    } catch (error) {
+        console.error("Error inserting data:", error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+});
+
+app.delete('/rtsp-info', async (req, res) => {
+    try {
+        const streaming_name = req.body.streaming_name;
+        await rtspTable.destroy({where : {streaming_name: streaming_name}})
+        res.status(200).json({ message: "Data delete successfully" });
+    } catch (error) {
+        console.error("Error inserting data:", error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+});
+
+app.put('/rtsp-info', async (req, res) => {
+    try {
+        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password } = req.body;
+        await rtspTable.update(
+            {
+                streaming_car_id : streaming_car_id,
+                streaming_url : streaming_url,
+                streaming_id : streaming_id,
+                streaming_password : streaming_password,
+            },
+            {
+                where : {streaming_name: streaming_name}
+            }
+        )
+        const updatedData = await rtspTable.findOne({
+            where: { streaming_name: streaming_name }
+        });
+        console.log(updatedData)
+        res.status(200).json({ message: "Data update successfully", data:updatedData });
+    } catch (error) {
+        console.error("Error inserting data:", error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+});
 
 function nextUniqueId() {
 	idCounter++;

@@ -3,14 +3,14 @@ const { Sequelize, DataTypes, Op } = require('sequelize');
 const sequelize = new Sequelize('rtsp', 'root', 'qwer1234', {
     host: 'localhost',
     dialect: 'mysql',
-    port : '3307',
+    port : '3308',
     logging: false,
     pool: {
         max: 5,          // 최대 커넥션 수
         min: 0,          // 최소 커넥션 수
         acquire: 30000,  // 커넥션을 얻으려고 시도하는 시간(밀리초)
         idle: 10000      // 커넥션을 해제하기 전에 대기하는 시간(밀리초)
-      }
+      },
 });
 
 const rtspTable = sequelize.define('t_rtsp', {

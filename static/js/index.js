@@ -18,32 +18,16 @@
 let ws = new WebSocket('ws://' + location.host + '/rtsp');
 let video;
 let webRtcPeer;
-let rtspUrl = '';
+let streamingName = '';
 let mediaRecorder;
 let recordedChunks = [];
 
 window.onload = () => {
 	console = new Console();
 	video = document.getElementById('video');
-	const startRecordButton = document.getElementById('recoding');
-	const stopRecordButton = document.getElementById('stop-recoding');
 
 	document.getElementById('viewer').addEventListener('click', function() { viewer(); } );
 	document.getElementById('terminate').addEventListener('click', function() { stop(); } );
-
-	// startRecordButton.addEventListener('click', function() {
-	// 	var message = {
-	// 		id : 'startRecording'
-	// 	}
-	// 	sendMessage(message);
-	// });
-
-	// stopRecordButton.addEventListener('click', function() {
-	// 	var message = {
-	// 		id : 'stopRecording'
-	// 	}
-	// 	sendMessage(message);
-	// });
 }
 
 window.onbeforeunload = () => {
@@ -56,7 +40,7 @@ ws.onclose = (event) => {
 
 ws.onmessage = (message) =>{
 	const parsedMessage = JSON.parse(message.data);
-	console.info('Received message: ' + message.data);
+	//console.info('Received message: ' + message.data);
 
 	switch (parsedMessage.id) {
 	case 'viewerResponse':
@@ -66,6 +50,7 @@ ws.onmessage = (message) =>{
 		dispose();
 		break;
 	case 'iceCandidate':
+		console.log("??????????")
 		webRtcPeer.addIceCandidate(parsedMessage.candidate)
 		break;
 	default:
@@ -87,8 +72,8 @@ const viewer = () => {
 	if (!ws) {
 		ws = new WebSocket('ws://' + location.host + '/rtsp');
 	}
-	rtspUrl = document.getElementById("rtsp-url").value
-	if(!rtspUrl){
+	streamingName = document.getElementById("streaming_name").value
+	if(!streamingName){
 		alert('Please enter a valid RTSP URL');
         return;
 	}
@@ -114,7 +99,7 @@ const onOfferViewer = (error, offerSdp) => {
 	const message = {
 		id : 'viewer',
 		sdpOffer : offerSdp,
-		rtspUrl : rtspUrl
+		streamingName : streamingName
 	}
 	sendMessage(message);
 }
@@ -151,7 +136,7 @@ const dispose = () => {
 
 const sendMessage = (message) => {
 	const jsonMessage = JSON.stringify(message);
-	console.log('Sending message: ' + jsonMessage);
+	//console.log('Sending message: ' + jsonMessage);
 	ws.send(jsonMessage);
 }
 

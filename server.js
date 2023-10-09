@@ -39,6 +39,8 @@ app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'static')));
 
+const RTSP_PORT = 1935
+
 /*
  * Definition of global variables.
  */
@@ -47,7 +49,7 @@ var candidatesQueue = {};
 var kurentoClient = null;
 var viewers = [];
 
-const checkTCPConnection = (ip, port) => {
+const checkTCPConnection = async (ip, port) => {
     return new Promise((resolve) => {
         const client = new net.Socket();
 
@@ -61,7 +63,7 @@ const checkTCPConnection = (ip, port) => {
             client.destroy();
         });
 
-        client.setTimeout(1000, () => {
+        client.setTimeout(500, () => {
             resolve({ ip, port, status: 'closed', isOpen : false });
             client.destroy();
         });
@@ -248,29 +250,75 @@ wss.on('connection', function(ws) {
 
         switch (message.id) {
         case 'viewer':
-            //TODO message.~ 로 데이터를 보낼 떄 rtspurl이 아닌 무선호출명으로 보내고, 해당 무선호출명으로 rtsp url을 데이터베이스에서 조회
-			startViewer(sessionId, ws, message.sdpOffer, message.rtspUrl, function(error, sdpAnswer) {
-				if (error) {
-					return ws.send(JSON.stringify({
-						id : 'viewerResponse',
-						response : 'rejected',
-						message : error
-					}));
-				}
+            console.log("viewer received")
+            // rtspTable.findOne({
+            //     where: { streaming_name: message.streamingName }
+            // }).then(selectResult => {
+            //     if(selectResult === null){
+            //         ws.send(JSON.stringify({
+            //             id : 'viewerResponse',
+            //             response : 'rejected',
+            //             message : "차량 정보 없음"
+            //         }));
+            //         return;
+            //     }
+            //     const rtspIP = selectResult.streaming_url
+            //     checkTCPConnection(rtspIP, RTSP_PORT)
+            //         .then(healthCheckResult => {
+            //             console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+            //             console.log(healthCheckResult)
+            //             if(!healthCheckResult.isOpen){
+            //                 ws.send(JSON.stringify({
+            //                     id : 'viewerResponse',
+            //                     response : 'rejected',
+            //                     message : "차량 카메라가 꺼져있음"
+            //                 }));
+            //                 return;
+            //             }
+            //             startViewer(sessionId, ws, message.sdpOffer, "rtsp://210.99.70.120:1935/live/cctv002.stream", function(error, sdpAnswer) {
+            //                 if (error) {
+            //                     return ws.send(JSON.stringify({
+            //                         id : 'viewerResponse',
+            //                         response : 'rejected',
+            //                         message : error
+            //                     }));
+            //                 }
 
-				ws.send(JSON.stringify({
-					id : 'viewerResponse',
-					response : 'accepted',
-					sdpAnswer : sdpAnswer
-				}));
-			});
+            //                 ws.send(JSON.stringify({
+            //                     id : 'viewerResponse',
+            //                     response : 'accepted',
+            //                     sdpAnswer : sdpAnswer
+            //                 }));
+            //             });
+            //         }).catch(err =>{
+            //             console.log("error",err)
+            //         })
+            // }).catch(err => {
+            //     console.log("error",err)
+            // });
+
+            startViewer(sessionId, ws, message.sdpOffer, "rtsp://210.99.70.120:1935/live/cctv002.stream", async function(error, sdpAnswer) {
+                if (error) {
+                    return ws.send(JSON.stringify({
+                        id : 'viewerResponse',
+                        response : 'rejected',
+                        message : error
+                    }));
+                }
+
+                ws.send(JSON.stringify({
+                    id : 'viewerResponse',
+                    response : 'accepted',
+                    sdpAnswer : sdpAnswer
+                }));
+            });
 			break;
-
         case 'stop':
             stop(sessionId);
             break;
 
         case 'onIceCandidate':
+            console.log("onIceCandidate received")
             onIceCandidate(sessionId, message.candidate);
             break;
 
@@ -289,7 +337,7 @@ wss.on('connection', function(ws) {
  */
 
 // Recover kurentoClient for the first time.
-function getKurentoClient(callback) {
+async function getKurentoClient(callback) {
     if (kurentoClient !== null) {
         return callback(null, kurentoClient);
     }
@@ -307,35 +355,51 @@ function getKurentoClient(callback) {
 }
 
 
-function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
-    clearCandidatesQueue(sessionId);
+async function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
 
-    getKurentoClient(function(error, kurentoClient) {
+    await clearCandidatesQueue(sessionId);
+
+    await getKurentoClient(async function(error, kurentoClient) {
         if (error) {
             stop(sessionId);
             return callback(error);
         }
 
-        kurentoClient.create('MediaPipeline', function(error, pipeline) {
+        await kurentoClient.create('MediaPipeline',async function(error, pipeline) {
             if (error) {
                 stop(sessionId);
                 return callback(error);
             }
 
-            pipeline.create('PlayerEndpoint', {uri: rtspUri}, function(error, player) {
+            await pipeline.create('PlayerEndpoint', {uri: rtspUri}, async function(error, player) {
                 if (error) {
                     stop(sessionId);
                     return callback(error);
                 }
 
-                pipeline.create('WebRtcEndpoint', function(error, webRtcEndpoint) {
+                await pipeline.create('WebRtcEndpoint', async function(error, webRtcEndpoint) {
                     if (error) {
                         stop(sessionId);
                         return callback(error);
                     }
 
+                    if (candidatesQueue[sessionId]) {
+                        while (candidatesQueue[sessionId].length) {
+                            var candidate = candidatesQueue[sessionId].shift();
+                            webRtcEndpoint.addIceCandidate(candidate);
+                        }
+                    }
+
+                    await webRtcEndpoint.on('IceCandidateFound',async function(event) {
+                        var candidate = kurento.getComplexType('IceCandidate')(event.candidate);
+                        ws.send(JSON.stringify({
+                            id: 'iceCandidate',
+                            candidate: candidate
+                        }));
+                    });
+
                     const recordUri = `file:///recorders/${getFormattedDate()}_재난번호_차량번호_${sessionId}.webm`;
-                    pipeline.create('RecorderEndpoint', {uri: recordUri, mediaProfile: 'WEBM_VIDEO_ONLY'}, function(error, recorder) {
+                    await pipeline.create('RecorderEndpoint', {uri: recordUri, mediaProfile: 'WEBM_VIDEO_ONLY'}, async function(error, recorder) {
                         if (error) {
                             stop(sessionId);
                             return callback(error);
@@ -347,12 +411,11 @@ function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                             recorder : recorder
                         };
 
-                        player.connect(recorder, function(error) {
+                        await player.connect(recorder, function(error) {
                             if (error) {
                                 stop(sessionId);
                                 return callback(error);
                             }
-                            console.log("Connected WebRtcEndpoint to RecorderEndpoint successfully");
                         })
 
                         webRtcEndpoint.setMaxVideoSendBandwidth(2000);
@@ -360,15 +423,8 @@ function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                         webRtcEndpoint.setMaxVideoRecvBandwidth(2000);
                         webRtcEndpoint.setMinVideoRecvBandwidth(500);
 
-                        if (candidatesQueue[sessionId]) {
-                            while (candidatesQueue[sessionId].length) {
-                                var candidate = candidatesQueue[sessionId].shift();
-                                webRtcEndpoint.addIceCandidate(candidate);
-                            }
-                        }
-
                         recorder.on("Recording", function(event){
-                            console.log("Recording",event)
+                            //console.log("Recording",event)
                         })
 
                         recorder.on("Paused", function(event){
@@ -379,8 +435,8 @@ function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                             console.log("Paused",event)
                         })
 
-                        webRtcEndpoint.on("MediaStateChanged", function(event) {
-                            console.log("MediaStateChanged",event)
+                        await webRtcEndpoint.on("MediaStateChanged", async function(event) {
+                            //console.log("MediaStateChanged",event)
                             if ((event.oldState !== event.newState) && (event.newState === 'CONNECTED')) {
                                 recorder.record(function(error) {
                                     if (error) {
@@ -388,46 +444,39 @@ function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                                         return callback(error);
                                     }
                                 });
-                                console.log("Recording started successfully");
+                                //console.log("Recording started successfully");
                             }
                         });
 
-                        webRtcEndpoint.on('IceCandidateFound', function(event) {
-                            var candidate = kurento.getComplexType('IceCandidate')(event.candidate);
-                            ws.send(JSON.stringify({
-                                id: 'iceCandidate',
-                                candidate: candidate
-                            }));
-                        });
-
-	                    webRtcEndpoint.processOffer(sdpOffer, function(error, sdpAnswer) {
+	                    await webRtcEndpoint.processOffer(sdpOffer,async function(error, sdpAnswer) {
                             if (error) {
                                 stop(sessionId);
                                 return callback(error);
                             }
 
-                            player.connect(webRtcEndpoint, function(error) {
+                            await webRtcEndpoint.gatherCandidates(async function(error) {
                                 if (error) {
                                     stop(sessionId);
                                     return callback(error);
                                 }
 
-                                player.play(function(error) {
+                                await player.connect(webRtcEndpoint, async function(error) {
                                     if (error) {
                                         stop(sessionId);
                                         return callback(error);
                                     }
-
-                                    callback(null, sdpAnswer);
+    
+                                    await player.play(async function(error) {
+                                        if (error) {
+                                            stop(sessionId);
+                                            return callback(error);
+                                        }
+    
+                                        await callback(null, sdpAnswer);
+                                    });
                                 });
                             });
-                        });
 
-                        webRtcEndpoint.gatherCandidates(function(error) {
-                            if (error) {
-                                stop(sessionId);
-                                return callback(error);
-                            }
                         });
                     });
                 });
@@ -436,7 +485,7 @@ function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
     });
 }
 
-function clearCandidatesQueue(sessionId) {
+async function clearCandidatesQueue(sessionId) {
   if (candidatesQueue[sessionId]) {
     delete candidatesQueue[sessionId];
   }
@@ -466,8 +515,7 @@ function onIceCandidate(sessionId, _candidate) {
     if (viewers[sessionId] && viewers[sessionId].webRtcEndpoint) {
         //console.info('Sending viewer candidate');
         viewers[sessionId].webRtcEndpoint.addIceCandidate(candidate);
-    }
-    else {
+    }else {
         //console.info('Queueing candidate');
         if (!candidatesQueue[sessionId]) {
             candidatesQueue[sessionId] = [];

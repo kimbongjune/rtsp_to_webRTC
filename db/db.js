@@ -3,7 +3,7 @@ const { Sequelize, DataTypes, Op } = require('sequelize');
 const sequelize = new Sequelize('rtsp', 'root', 'qwer1234', {
     host: 'localhost',
     dialect: 'mysql',
-    port : '3308',
+    port : '3307',
     logging: false,
     pool: {
         max: 5,          // 최대 커넥션 수

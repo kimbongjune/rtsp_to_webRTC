@@ -19,13 +19,13 @@ const path = require('path');
 const { URL } = require('url');
 const express = require('express');
 const minimist = require('minimist');
-const ws = require('ws');
 const kurento = require('kurento-client');
 const bodyParser = require('body-parser');
 const { sequelize, rtspTable, Op } = require('./db/db');
-const axios = require('axios');
 const cors = require('cors');
 const net = require('net');
+const http = require('http');
+const socketIo = require('socket.io');
 
 var argv = minimist(process.argv.slice(2), {
     default: {
@@ -39,7 +39,31 @@ app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'static')));
 
+const server = http.createServer(app);
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+        credentials: true
+    }
+});
+
 const RTSP_PORT = 1935
+
+/*
+ * Server startup
+ */
+const asUrl = new URL(argv.as_uri);
+var port = asUrl.port;
+
+server.listen(port, function() {
+    console.log('Kurento Tutorial started');
+    console.log('Open ' + asUrl + ' with a WebRTC capable browser');
+});
+
+const sendMessage = (socket, id, message) =>{
+    socket.emit(id, message);
+}
 
 /*
  * Definition of global variables.
@@ -70,36 +94,22 @@ const checkTCPConnection = async (ip, port) => {
     });
 }
 
+// const addresses = [
+//     { ip: '210.99.70.120', port: 1935 },
+//     { ip: '210.99.70.120', port: 1935 },
+// ];
 
-// const tcp_ip = '210.99.70.120';
-// const tcp_port = 1935;
+// Promise.all(addresses.map(addr => checkTCPConnection(addr.ip, addr.port)))
+//     .then((results) => {
+//         //console.log(results);
+//         results.forEach(result => {
+//             console.log(`${result.ip}:${result.port} is ${result.status}, open = ${result.isOpen}`);
+//         });
+//     });
 
-// checkTCPConnection(tcp_ip, tcp_port).then((result) => {
-//     if (result.isOpen) {
-//         console.log('서버 열려 있음');
-//     } else {
-//         console.log('서버 닫혀 있음');
-//     }
-// }).catch(() => {
-//     console.log('서버 닫혀 있음');
-// });
-
-const addresses = [
-    { ip: '210.99.70.120', port: 1935 },
-    { ip: '210.99.70.120', port: 1935 },
-];
-
-Promise.all(addresses.map(addr => checkTCPConnection(addr.ip, addr.port)))
-    .then((results) => {
-        //console.log(results);
-        results.forEach(result => {
-            console.log(`${result.ip}:${result.port} is ${result.status}, open = ${result.isOpen}`);
-        });
-    });
-
-app.post('/health', async (req, res) => {
-    const dataArray = req.body.carId || [];
-    //res.json({ receivedData: dataArray });
+app.get('/health-check', async (req, res) => {
+    const dataArray = req.query.carId.split(',').map(String) || [];
+    console.log(dataArray)
     try {
         const results = await rtspTable.findAll({
             where: {
@@ -109,20 +119,28 @@ app.post('/health', async (req, res) => {
             }
         });
 
-        //TODO 반환된 url을 이용해 restapi를 요청하고 응답값에 따라 헬스 체크 상태를 반환한다.
-        results.filter(data => data.streaming_url !== undefined).forEach(data => console.log(data.streaming_url));
+        console.log(results)
+
+        const checkedResponses = await Promise.all(dataArray.map(async carId => {
+            const found = results.find(result => result.streaming_name === carId);
+            if (found) {
+                const connectionResult = await checkTCPConnection(found.ip, RTSP_PORT);
+                return {
+                    ...found.dataValues,
+                    status: connectionResult.status,
+                    isOpen: connectionResult.isOpen,
+                };
+            } else {
+                return { streaming_name: carId, message: "차량 매핑 테이블 없음", response : "fail" };
+            }
+        }));
+
+        res.json(checkedResponses);
         
-        res.json(results);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
-
-/*
- * Server startup
- */
-const asUrl = new URL(argv.as_uri);
-var port = asUrl.port;
 
 sequelize.sync()
     .then(() => {
@@ -131,26 +149,6 @@ sequelize.sync()
     .catch(error => {
         console.error("Failed to connect to the database:", error);
     });
-
-var server = app.listen(port, function() {
-    console.log('Kurento Tutorial started');
-    console.log('Open ' + asUrl + ' with a WebRTC capable browser');
-});
-
-var wss = new ws.Server({
-    server : server,
-    path : '/rtsp',
-    verifyClient : (info, done) => {
-        const origin = info.origin;
-        const allowedOrigins = ["*"];
-
-        if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
-            done(true);
-        } else {
-            done(false, 403, "CORS not allowed");
-        }
-    }
-});
 
 app.get('/manage', (req, res) => {
     res.sendFile(path.join(__dirname, 'static', 'board.html'));
@@ -226,111 +224,83 @@ function nextUniqueId() {
 	return idCounter.toString();
 }
 
-/*
- * Management of WebSocket messages
- */
-wss.on('connection', function(ws) {
+io.on('connection', (socket) => {
+    let sessionId = nextUniqueId();
+    console.log('Connection received with sessionId ' + sessionId);
 
-	var sessionId = nextUniqueId();
-	console.log('Connection received with sessionId ' + sessionId);
+    socket.on("healthCheck", async(data) =>{
+        const selectResult = await rtspTable.findOne({
+            where: { streaming_name: data.streamingName }
+        });
+        
+        if(!selectResult) {
+            const message = {
+                response: 'error',
+                message: "차량 정보 없음"
+            }
+            sendMessage(socket, 'healthCheckResponse', message)
+            return;
+        }
 
-    ws.on('error', function(error) {
-        //console.log('Connection ' + sessionId + ' error');
-        stop(sessionId);
-    });
+        const rtspIP = selectResult.streaming_url;
+        const healthCheckResult = await checkTCPConnection(rtspIP, RTSP_PORT);
 
-    ws.on('close', function() {
-        //console.log('Connection ' + sessionId + ' closed');
-        stop(sessionId);
-    });
+        if(!healthCheckResult.isOpen) {
+            const message = {
+                response: 'error',
+                message: "차량 카메라가 꺼져있음"
+            }
+            sendMessage(socket, 'healthCheckResponse', message)
+            return;
+        }
+        const message = {
+            response: 'success',
+            message: "정상",
+            result : selectResult.dataValues
+        }
+        sendMessage(socket, 'healthCheckResponse', message)
+    })
 
-    ws.on('message', function(_message) {
-        var message = JSON.parse(_message);
-        //console.log('Connection ' + sessionId + ' received message ', message);
-
-        switch (message.id) {
-        case 'viewer':
-            console.log("viewer received")
-            // rtspTable.findOne({
-            //     where: { streaming_name: message.streamingName }
-            // }).then(selectResult => {
-            //     if(selectResult === null){
-            //         ws.send(JSON.stringify({
-            //             id : 'viewerResponse',
-            //             response : 'rejected',
-            //             message : "차량 정보 없음"
-            //         }));
-            //         return;
-            //     }
-            //     const rtspIP = selectResult.streaming_url
-            //     checkTCPConnection(rtspIP, RTSP_PORT)
-            //         .then(healthCheckResult => {
-            //             console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-            //             console.log(healthCheckResult)
-            //             if(!healthCheckResult.isOpen){
-            //                 ws.send(JSON.stringify({
-            //                     id : 'viewerResponse',
-            //                     response : 'rejected',
-            //                     message : "차량 카메라가 꺼져있음"
-            //                 }));
-            //                 return;
-            //             }
-            //             startViewer(sessionId, ws, message.sdpOffer, "rtsp://210.99.70.120:1935/live/cctv002.stream", function(error, sdpAnswer) {
-            //                 if (error) {
-            //                     return ws.send(JSON.stringify({
-            //                         id : 'viewerResponse',
-            //                         response : 'rejected',
-            //                         message : error
-            //                     }));
-            //                 }
-
-            //                 ws.send(JSON.stringify({
-            //                     id : 'viewerResponse',
-            //                     response : 'accepted',
-            //                     sdpAnswer : sdpAnswer
-            //                 }));
-            //             });
-            //         }).catch(err =>{
-            //             console.log("error",err)
-            //         })
-            // }).catch(err => {
-            //     console.log("error",err)
-            // });
-
-            startViewer(sessionId, ws, message.sdpOffer, "rtsp://210.99.70.120:1935/live/cctv002.stream", async function(error, sdpAnswer) {
-                if (error) {
-                    return ws.send(JSON.stringify({
-                        id : 'viewerResponse',
-                        response : 'rejected',
-                        message : error
-                    }));
+    socket.on('viewer', async (data) => {
+        try {
+            const rtspIp = generateRtspEndpoint(data.rtspIp)
+            const disasterNumber = data.disasterNumber
+            const carNumber = data.carNumber
+            await startViewer(sessionId, socket, data.sdpOffer, rtspIp, disasterNumber, carNumber, function(error, sdpAnswer) {
+                if(error) {
+                    const message = {
+                        response: 'rejected',
+                        message: error
+                    }
+                    sendMessage(socket, 'viewerResponse', message)
+                } else {
+                    const message = {
+                        response: 'accepted',
+                        sdpAnswer: sdpAnswer
+                    }
+                    sendMessage(socket, 'viewerResponse', message)
                 }
-
-                ws.send(JSON.stringify({
-                    id : 'viewerResponse',
-                    response : 'accepted',
-                    sdpAnswer : sdpAnswer
-                }));
             });
-			break;
-        case 'stop':
-            stop(sessionId);
-            break;
-
-        case 'onIceCandidate':
-            console.log("onIceCandidate received")
-            onIceCandidate(sessionId, message.candidate);
-            break;
-
-        default:
-            ws.send(JSON.stringify({
-                id : 'error',
-                message : 'Invalid message ' + message
-            }));
-            break;
+        } catch(error) {
+            console.log(error);
+            const message = {
+                response: 'error',
+                message: error
+            }
+            sendMessage(socket, 'error', message)
         }
     });
+
+    socket.on('stop', () => {
+        stop(sessionId);
+    });
+
+    socket.on('onIceCandidate', (data) => {
+        console.log("?")
+        onIceCandidate(sessionId, data.candidate);
+    });
 });
+
 
 /*
  * Definition of functions
@@ -355,7 +325,7 @@ async function getKurentoClient(callback) {
 }
 
 
-async function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
+async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber, carNumber, callback) {
 
     await clearCandidatesQueue(sessionId);
 
@@ -365,7 +335,7 @@ async function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
             return callback(error);
         }
 
-        await kurentoClient.create('MediaPipeline',async function(error, pipeline) {
+        await kurentoClient.create('MediaPipeline', async function(error, pipeline) {
             if (error) {
                 stop(sessionId);
                 return callback(error);
@@ -390,15 +360,16 @@ async function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                         }
                     }
 
-                    await webRtcEndpoint.on('IceCandidateFound',async function(event) {
+                    webRtcEndpoint.on('IceCandidateFound', async function(event) {
                         var candidate = kurento.getComplexType('IceCandidate')(event.candidate);
-                        ws.send(JSON.stringify({
+                        const message = {
                             id: 'iceCandidate',
                             candidate: candidate
-                        }));
+                        }
+                        sendMessage(socket, 'iceCandidate', message)
                     });
 
-                    const recordUri = `file:///recorders/${getFormattedDate()}_재난번호_차량번호_${sessionId}.webm`;
+                    const recordUri = `file:///recorders/${getFormattedDate()}_${disasterNumber}_${carNumber}_${sessionId}.webm`;
                     await pipeline.create('RecorderEndpoint', {uri: recordUri, mediaProfile: 'WEBM_VIDEO_ONLY'}, async function(error, recorder) {
                         if (error) {
                             stop(sessionId);
@@ -407,8 +378,8 @@ async function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
 
                         viewers[sessionId] = {
                             webRtcEndpoint: webRtcEndpoint,
-                            ws: ws,
-                            recorder : recorder
+                            socket: socket,
+                            recorder: recorder
                         };
 
                         await player.connect(recorder, function(error) {
@@ -416,7 +387,7 @@ async function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                                 stop(sessionId);
                                 return callback(error);
                             }
-                        })
+                        });
 
                         webRtcEndpoint.setMaxVideoSendBandwidth(2000);
                         webRtcEndpoint.setMinVideoSendBandwidth(500);
@@ -448,7 +419,10 @@ async function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                             }
                         });
 
-	                    await webRtcEndpoint.processOffer(sdpOffer,async function(error, sdpAnswer) {
+                        // 이벤트 핸들러들...
+                        // 원래 코드를 유지
+
+                        await webRtcEndpoint.processOffer(sdpOffer, async function(error, sdpAnswer) {
                             if (error) {
                                 stop(sessionId);
                                 return callback(error);
@@ -476,7 +450,6 @@ async function startViewer(sessionId, ws, sdpOffer, rtspUri, callback) {
                                     });
                                 });
                             });
-
                         });
                     });
                 });
@@ -535,4 +508,8 @@ function getFormattedDate() {
     const seconds = String(currentDate.getSeconds()).padStart(2, '0');
 
     return `${year}_${month}_${day}-${hours}_${minutes}_${seconds}`;
+}
+
+function generateRtspEndpoint(rtspIp){
+    return `rtsp://${rtspIp}:${RTSP_PORT}/live/cctv002.stream`
 }

@@ -6,14 +6,14 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      #- D:\vsCodeFile\rtsp_to_webRTC\static\recorers:/recorders
-      - C:\dev_tool\github\rtsp_to_webRTC\rtsp_to_webRTC\static\recorders:/recorders
+      - D:\vsCodeFile\rtsp_to_webRTC\static\recorers:/recorders
+      #- C:\dev_tool\github\rtsp_to_webRTC\rtsp_to_webRTC\static\recorders:/recorders
 
   db:
     image: mysql:latest
     ports:
-      #- "3307:3306"
-      - "3308:3306"
+      - "3307:3306"
+      #- "3308:3306"
     command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_DATABASE: rtsp

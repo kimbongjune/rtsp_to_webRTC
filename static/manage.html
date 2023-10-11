@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">
-    <script src="bower_components/jquery/dist/jquery.min.js"></script>
-    <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="/bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <script src="/bower_components/jquery/dist/jquery.min.js"></script>
+    <script src="/bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
     
     <link href="https://cdn.datatables.net/v/bs5/jq-3.7.0/dt-1.13.6/datatables.min.css" rel="stylesheet">
  
@@ -14,7 +14,7 @@
     <script src="https://cdn.datatables.net/v/bs5/jq-3.7.0/dt-1.13.6/datatables.min.js"></script>
     <script src="https://bartaz.github.io/sandbox.js/jquery.highlight.js"></script>
     <script src="https://cdn.datatables.net/plug-ins/1.13.6/features/searchHighlight/dataTables.searchHighlight.min.js"></script>
-    <script src="bower_components/axios/dist/axios.js"></script>
+    <script src="/bower_components/axios/dist/axios.js"></script>
     <style>
         body{
             padding: 1rem;
@@ -184,7 +184,7 @@
 <script>
 $(document).ready(async function () {
     let table
-    await axios.get('/rtsp-info')
+    await axios.get('/api/rtsp-info')
         .then(function(response) {
             // 여기에서 response.data를 처리합니다.
             const rtspData = response.data;
@@ -290,7 +290,7 @@ $(document).ready(async function () {
             };
 
             try {
-                const response = await axios.post("/rtsp-info", data);
+                const response = await axios.post("/api/rtsp-info", data);
                 console.log(response)
                 
                 if(response.status === 200) {
@@ -384,7 +384,7 @@ $(document).ready(async function () {
             };
 
             try {
-                const response = await axios.put("/rtsp-info", data);
+                const response = await axios.put("/api/rtsp-info", data);
                 console.log(response)
                 
                 if(response.status === 200) {
@@ -403,7 +403,7 @@ $(document).ready(async function () {
                 console.log(data)
                 const response = await axios({
                     method: 'DELETE',
-                    url: '/rtsp-info',
+                    url: '/api/rtsp-info',
                     data: { streaming_name: data[0] }
                 });
                 

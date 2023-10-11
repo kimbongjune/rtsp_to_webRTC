@@ -3,9 +3,14 @@
   "version": "6.18.1-dev",
   "private": true,
   "scripts": {
-    "postinstall": "cd static && bower install"
+    "postinstall": "cd static && bower install",
+    "dev": "node server.js",
+    "start": "npx pm2 start server.js",
+    "stop-all": "npx pm2 stop all",
+    "list": "npx pm2 list"
   },
   "dependencies": {
+    "@socket.io/admin-ui": "^0.5.1",
     "axios": "^1.5.1",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
@@ -15,9 +20,10 @@
     "minimist": "^1.1.1",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.6.1",
+    "node-schedule": "^2.1.1",
+    "pm2": "^5.3.0",
     "sequelize": "^6.33.0",
-    "socket.io": "^4.7.2",
-    "ws": "^7.1.0"
+    "socket.io": "^4.7.2"
   },
   "devDependencies": {
     "bower": "^1.8.14"

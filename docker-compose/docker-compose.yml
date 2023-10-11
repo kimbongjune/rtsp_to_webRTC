@@ -6,7 +6,7 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - D:\vsCodeFile\rtsp_to_webRTC\static\recorers:/recorders
+      - D:\vsCodeFile\rtsp_to_webRTC\static\recorders:/recorders
       #- C:\dev_tool\github\rtsp_to_webRTC\rtsp_to_webRTC\static\recorders:/recorders
 
   db:

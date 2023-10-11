@@ -26,6 +26,10 @@ const cors = require('cors');
 const net = require('net');
 const http = require('http');
 const socketIo = require('socket.io');
+const apiRoute = require('./routes/api');
+const manageRoute = require('./routes/manage');
+const { instrument } = require("@socket.io/admin-ui");
+const startScheduler = require('./scheduler/scheduler');
 
 var argv = minimist(process.argv.slice(2), {
     default: {
@@ -38,17 +42,23 @@ var app = express();
 app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'static')));
+app.use('/bower_components', express.static(path.join(__dirname, 'static', "bower_components")));
+app.use('/api', apiRoute);
+app.use('/manage', manageRoute);
+app.use('/socket-panel', express.static(path.join(__dirname, 'node_modules', '@socket.io', 'admin-ui', 'ui', 'dist')));
+const RTSP_PORT = 1935
 
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
+        origin: ["*", "https://admin.socket.io"],
         credentials: true
     }
 });
 
-const RTSP_PORT = 1935
+instrument(io, { 
+    auth: false,
+});
 
 /*
  * Server startup
@@ -59,6 +69,7 @@ var port = asUrl.port;
 server.listen(port, function() {
     console.log('Kurento Tutorial started');
     console.log('Open ' + asUrl + ' with a WebRTC capable browser');
+    startScheduler()
 });
 
 const sendMessage = (socket, id, message) =>{
@@ -150,75 +161,6 @@ sequelize.sync()
         console.error("Failed to connect to the database:", error);
     });
 
-app.get('/manage', (req, res) => {
-    res.sendFile(path.join(__dirname, 'static', 'board.html'));
-});
-
-app.get('/rtsp-info', async (req, res) => {
-    try {
-        const results = await rtspTable.findAll();
-        //console.log(results);
-        res.json(results);
-    } catch (error) {
-        console.error("Error fetching data:", error);
-        res.json(error);
-    }
-});
-
-app.post('/rtsp-info', async (req, res) => {
-    try {
-        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password } = req.body;
-        console.log(req.body)
-        const createdData = await rtspTable.create({
-            streaming_name: streaming_name,
-            streaming_car_id: streaming_car_id,
-            streaming_url: streaming_url,
-            streaming_id: streaming_id,
-            streaming_password: streaming_password
-        });
-        res.status(200).json({ message: "Data inserted successfully", data:createdData });
-    } catch (error) {
-        console.error("Error inserting data:", error);
-        res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
-});
-
-app.delete('/rtsp-info', async (req, res) => {
-    try {
-        const streaming_name = req.body.streaming_name;
-        await rtspTable.destroy({where : {streaming_name: streaming_name}})
-        res.status(200).json({ message: "Data delete successfully" });
-    } catch (error) {
-        console.error("Error inserting data:", error);
-        res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
-});
-
-app.put('/rtsp-info', async (req, res) => {
-    try {
-        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password } = req.body;
-        await rtspTable.update(
-            {
-                streaming_car_id : streaming_car_id,
-                streaming_url : streaming_url,
-                streaming_id : streaming_id,
-                streaming_password : streaming_password,
-            },
-            {
-                where : {streaming_name: streaming_name}
-            }
-        )
-        const updatedData = await rtspTable.findOne({
-            where: { streaming_name: streaming_name }
-        });
-        console.log(updatedData)
-        res.status(200).json({ message: "Data update successfully", data:updatedData });
-    } catch (error) {
-        console.error("Error inserting data:", error);
-        res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
-});
-
 function nextUniqueId() {
 	idCounter++;
 	return idCounter.toString();
@@ -228,7 +170,15 @@ io.on('connection', (socket) => {
     let sessionId = nextUniqueId();
     console.log('Connection received with sessionId ' + sessionId);
 
-    socket.on("healthCheck", async(data) =>{
+    socket.on("rtcConnect", async(data) =>{
+        if(data.streamingName === "" || !data.streamingName){
+            const message = {
+                response: 'error',
+                message: `필수 파라미터 (streamingName) 누락`
+            }
+            sendMessage(socket, 'rtcConnectResponse', message)
+            return;
+        }
         const selectResult = await rtspTable.findOne({
             where: { streaming_name: data.streamingName }
         });
@@ -238,7 +188,7 @@ io.on('connection', (socket) => {
                 response: 'error',
                 message: "차량 정보 없음"
             }
-            sendMessage(socket, 'healthCheckResponse', message)
+            sendMessage(socket, 'rtcConnectResponse', message)
             return;
         }
 
@@ -250,7 +200,7 @@ io.on('connection', (socket) => {
                 response: 'error',
                 message: "차량 카메라가 꺼져있음"
             }
-            sendMessage(socket, 'healthCheckResponse', message)
+            sendMessage(socket, 'rtcConnectResponse', message)
             return;
         }
         const message = {
@@ -258,15 +208,48 @@ io.on('connection', (socket) => {
             message: "정상",
             result : selectResult.dataValues
         }
-        sendMessage(socket, 'healthCheckResponse', message)
+        sendMessage(socket, 'rtcConnectResponse', message)
     })
 
     socket.on('viewer', async (data) => {
         try {
+            console.log(data.streamingName)
+            if(data.streamingName === "" || !data.streamingName){
+                const message = {
+                    response: 'rejected',
+                    message: `필수 파라미터 (streamingName) 누락`
+                }
+                sendMessage(socket, 'viewerResponse', message)
+                return;
+            }
+            if(data.rtspIp === "" || !data.rtspIp){
+                const message = {
+                    response: 'rejected',
+                    message: `필수 파라미터 (rtspIp) 누락`
+                }
+                sendMessage(socket, 'viewerResponse', message)
+                return;
+            }
+            if(data.disasterNumber === "" || !data.disasterNumber){
+                const message = {
+                    response: 'rejected',
+                    message: `필수 파라미터 (disasterNumber) 누락`
+                }
+                sendMessage(socket, 'viewerResponse', message)
+                return;
+            }
+            if(data.carNumber === "" || !data.carNumber){
+                const message = {
+                    response: 'rejected',
+                    message: `필수 파라미터 (carNumber) 누락`
+                }
+                sendMessage(socket, 'viewerResponse', message)
+                return;
+            }
             const rtspIp = generateRtspEndpoint(data.rtspIp)
             const disasterNumber = data.disasterNumber
             const carNumber = data.carNumber
-            await startViewer(sessionId, socket, data.sdpOffer, rtspIp, disasterNumber, carNumber, function(error, sdpAnswer) {
+            await startViewer(sessionId, socket, data.sdpOffer, rtspIp, disasterNumber, carNumber, data.streamingName, function(error, sdpAnswer) {
                 if(error) {
                     const message = {
                         response: 'rejected',
@@ -296,7 +279,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('onIceCandidate', (data) => {
-        console.log("?")
         onIceCandidate(sessionId, data.candidate);
     });
 });
@@ -325,7 +307,7 @@ async function getKurentoClient(callback) {
 }
 
 
-async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber, carNumber, callback) {
+async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber, carNumber, streamingName, callback) {
 
     await clearCandidatesQueue(sessionId);
 
@@ -369,7 +351,7 @@ async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber,
                         sendMessage(socket, 'iceCandidate', message)
                     });
 
-                    const recordUri = `file:///recorders/${getFormattedDate()}_${disasterNumber}_${carNumber}_${sessionId}.webm`;
+                    const recordUri = `file:///recorders/${getFormattedDate()}_${streamingName}_${disasterNumber}_${carNumber}_${sessionId}.webm`;
                     await pipeline.create('RecorderEndpoint', {uri: recordUri, mediaProfile: 'WEBM_VIDEO_ONLY'}, async function(error, recorder) {
                         if (error) {
                             stop(sessionId);
@@ -415,12 +397,8 @@ async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber,
                                         return callback(error);
                                     }
                                 });
-                                //console.log("Recording started successfully");
                             }
                         });
-
-                        // 이벤트 핸들러들...
-                        // 원래 코드를 유지
 
                         await webRtcEndpoint.processOffer(sdpOffer, async function(error, sdpAnswer) {
                             if (error) {
@@ -465,17 +443,17 @@ async function clearCandidatesQueue(sessionId) {
 }
 
 function stop(sessionId) {
-console.log("Stopping recorder for session:", sessionId);
-  if (viewers[sessionId]) {
+    console.log("Stopping recorder for session:", sessionId);
+    if (viewers[sessionId]) {
         viewers[sessionId].recorder.stop();
         viewers[sessionId].recorder.release();
         viewers[sessionId].webRtcEndpoint.release();
         delete viewers[sessionId];
-  }
+    }
 
-  clearCandidatesQueue(sessionId);
+    clearCandidatesQueue(sessionId);
 
-  if (viewers.length < 1) {
+    if (viewers.length < 1) {
         console.log('Closing kurento client');
         kurentoClient?.close();
         kurentoClient = null;

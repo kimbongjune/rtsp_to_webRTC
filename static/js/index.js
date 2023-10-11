@@ -48,17 +48,25 @@ const viewerResponse = (message) => {
 
 const healthCheck = () =>{
 	streamingName = document.getElementById("streaming_name").value;
+
+    if (!socket.connected) {
+        socket.connect();
+    }
     if (!streamingName) {
         alert('Please enter a valid RTSP URL');
         return;
     }
     const message = {streamingName: streamingName}
-    sendMessage("healthCheck", message)
+    sendMessage("rtcConnect", message)
 }
 
-const viewer = (rtspIp) => {
+const viewer = (rtspIp, streamingName) => {
     if (!webRtcPeer) {
         showSpinner(video);
+
+        if (!socket.connected) {
+            socket.connect();
+        }
 
         const options = {
             remoteVideo: video,
@@ -68,12 +76,12 @@ const viewer = (rtspIp) => {
         webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(options, function(error) {
             if (error) return onError(error);
 
-            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp));
+            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName));
         });
     }
 }
 
-const onOfferViewer = (error, offerSdp, rtspIp) => {
+const onOfferViewer = (error, offerSdp, rtspIp, streamingName) => {
     if (error) return onError(error);
 
     const message = {
@@ -81,7 +89,8 @@ const onOfferViewer = (error, offerSdp, rtspIp) => {
         sdpOffer: offerSdp,
         rtspIp: rtspIp,
 		disasterNumber : "재난번호",
-		carNumber : "차량번호"
+		carNumber : "차량번호",
+        streamingName : streamingName
     }
     sendMessage("viewer", message)
 }
@@ -144,6 +153,7 @@ socket.on('connect', function() {
 
 // 'connect_error' 이벤트는 연결에 오류가 발생했을 때 발생합니다.
 socket.on('connect_error', function(error) {
+    console.log(error)
     stop()
 });
 
@@ -161,9 +171,11 @@ socket.on('stopCommunication', dispose);
 socket.on('iceCandidate', (data) => {
     webRtcPeer.addIceCandidate(data.candidate);
 });
-socket.on('healthCheckResponse', (data) => {
+socket.on('rtcConnectResponse', (data) => {
     if(data.response === "success"){
-		console.log(data.result)
-		viewer(data.result.streaming_url)
-	}
+		console.log(data)
+		viewer(data.result.streaming_url, data.result.streaming_name)
+	}else{
+        console.log(data)
+    }
 });

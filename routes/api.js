@@ -91,7 +91,7 @@ router.get('/videos', async (req, res) => {
             let duration;
             try {
                 duration = await getVideoDuration(filePath);
-                if (!duration) { // ffprobe에서 오류가 발생했을 때 duration은 null이 될 것입니다.
+                if (!duration) {
                     duration = 0;
                 }
             } catch (error) {
@@ -107,7 +107,7 @@ router.get('/videos', async (req, res) => {
                 creationTime: formatDate(fileStat.birthtime),
                 size: formatBytes(fileStat.size),
                 streamingName : streamingName,
-                path : `/static/recorders/${file}`,
+                path : `/recorders/${file}`,
                 duration : formatDuration(duration),
                 expirationTime : formatDate(fileStat.birthtime, 2)
             };

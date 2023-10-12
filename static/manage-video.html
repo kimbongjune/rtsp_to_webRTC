@@ -79,6 +79,23 @@
           </div>
         </div>
       </div>
+
+      <div class="modal fade" id="videoModal" tabindex="-1" role="dialog" aria-labelledby="videoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="videoModalLabel">CCTV 영상</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <video id="video" style="display: block; margin: 0 auto;"
+                        class="video-js vjs-default-skin" preload="none" crossorigin="true" controls
+                        width="640" height="268" controls></video>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 <script>
 $(document).ready(async function () {
@@ -86,7 +103,7 @@ $(document).ready(async function () {
     await axios.get('/api/videos')
         .then(function(response) {
             // 여기에서 response.data를 처리합니다.
-            console.log(response)
+            //console.log(response)
             const rtspData = response.data;
             const tableBody = document.getElementById('rtsp_table').getElementsByTagName('tbody')[0];
                 rtspData.forEach(item => {
@@ -102,17 +119,23 @@ $(document).ready(async function () {
                 const cell8 = row.insertCell(7);
                 const cell9 = row.insertCell(8);
 
-                const link = document.createElement('a');
-                link.href = item.path; // 경로를 href로 설정하거나 다른 URL로 설정 가능
-                link.innerText = "영상 보기";
-                link.addEventListener('click', function(event) {
-                event.preventDefault(); 
-                event.stopPropagation();
+                if(item.duration !== "파일손상(재생불가)"){
+                    const link = document.createElement('a');
+                    link.href = item.path; // 경로를 href로 설정하거나 다른 URL로 설정 가능
+                    link.innerText = "영상 보기";
+                    link.addEventListener('click', function(event) {
+                        event.preventDefault(); 
+                        event.stopPropagation();
+                        
+                        const videoUrl = event.currentTarget.href;
+                        //console.log(videoUrl);
+                        stremVideo(videoUrl, item.streamingName)
+                    });
+                    cell5.appendChild(link);
+                }else{
+                    cell5.innerText = "재생 불가"
+                }
                 
-                const videoUrl = event.currentTarget.href;
-                console.log(videoUrl);
-            });
-                cell5.appendChild(link);
 
                 cell1.innerText = item.streamingName;
                 cell2.innerText = item.carNumber;
@@ -213,6 +236,29 @@ $(document).ready(async function () {
                 console.error("Error:", error.response.data);
             }
         })
+
+        function stremVideo(videoSrc, videoName) {
+            const modal = $("#videoModal");
+
+            const modalTitle = $("#videoModalLabel");
+            modalTitle.text(`${videoName} CCTV 영상`);
+
+            // 비디오 플레이어 요소 선택
+            const videoPlayer = $("#video");
+
+            // 비디오 소스 업데이트
+            videoPlayer.attr('src', videoSrc);
+
+            // 비디오를 자동 재생하기 위한 설정
+            videoPlayer.prop('autoplay', true);
+
+            // 모달 열기
+            modal.modal("show");
+
+            modal.on("hidden.bs.modal", function () {
+                videoPlayer.get(0).pause();
+            });
+        }
 });
 </script>
 </html>

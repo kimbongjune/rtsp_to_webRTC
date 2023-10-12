@@ -17,7 +17,7 @@
 
 let socket = io.connect(location.host);
 let video;
-let webRtcPeer;
+let webRtcPeer = {}
 let streamingName = '';
 
 const sendMessage = (id, message) =>{
@@ -25,15 +25,20 @@ const sendMessage = (id, message) =>{
 }
 
 window.onload = () => {
-    console = new Console();
+    //console = new Console();
     video = document.getElementById('video');
 
-    document.getElementById('viewer').addEventListener('click', function() { healthCheck(); });
-    document.getElementById('terminate').addEventListener('click', function() { stop(); });
+    document.getElementById('viewer').addEventListener('click', function() { rtcConnect(); });
+    document.getElementById('terminate').addEventListener('click', function() { 
+        const uuid = this.getAttribute('data-uuid');
+        if(uuid) {
+            stop(uuid);
+        }
+    });
 }
 
 window.onbeforeunload = () => {
-    stop();
+    Object.keys(webRtcPeer).forEach(stop);
 }
 
 const viewerResponse = (message) => {
@@ -42,11 +47,11 @@ const viewerResponse = (message) => {
         console.warn('Call not accepted for the following reason: ' + errorMsg);
         dispose();
     } else {
-        webRtcPeer.processAnswer(message.sdpAnswer);
+        webRtcPeer[message.streamUUID].processAnswer(message.sdpAnswer);
     }
 }
 
-const healthCheck = () =>{
+const rtcConnect = () =>{
 	streamingName = document.getElementById("streaming_name").value;
 
     if (!socket.connected) {
@@ -60,8 +65,8 @@ const healthCheck = () =>{
     sendMessage("rtcConnect", message)
 }
 
-const viewer = (rtspIp, streamingName) => {
-    if (!webRtcPeer) {
+const viewer = (streamUUID, rtspIp, streamingName) => {
+    if (!webRtcPeer[streamUUID]) {
         showSpinner(video);
 
         if (!socket.connected) {
@@ -70,56 +75,54 @@ const viewer = (rtspIp, streamingName) => {
 
         const options = {
             remoteVideo: video,
-            onicecandidate: onIceCandidate
+            onicecandidate: (candidate) => onIceCandidate(candidate, streamUUID)
         }
 
-        webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(options, function(error) {
+        webRtcPeer[streamUUID] = kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(options, function(error) {
             if (error) return onError(error);
 
-            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName));
+            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName, streamUUID));
         });
     }
 }
 
-const onOfferViewer = (error, offerSdp, rtspIp, streamingName) => {
+const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID) => {
     if (error) return onError(error);
 
     const message = {
-        id: 'viewer',
         sdpOffer: offerSdp,
         rtspIp: rtspIp,
 		disasterNumber : "재난번호",
 		carNumber : "차량번호",
-        streamingName : streamingName
+        streamingName : streamingName,
+        streamUUID : streamUUID
     }
     sendMessage("viewer", message)
 }
 
-const onIceCandidate = (candidate) => {
-    console.log('Local candidate' + JSON.stringify(candidate));
-
+const onIceCandidate = (candidate, streamUUID) => {
     const message = {
-        id: 'onIceCandidate',
-        candidate: candidate
+        candidate: candidate,
+        streamUUID : streamUUID
     }
     sendMessage("onIceCandidate", message)
 }
 
-const stop = () => {
-    console.log("stop");
-    if (webRtcPeer) {
+const stop = (streamUUID) => {
+    console.log("Stopping stream with UUID:", streamUUID);
+    if (webRtcPeer[streamUUID]) {
         const message = {
-            id: 'stop'
-        }
-        sendMessage("stop", message)
-        dispose();
+            streamUUID: streamUUID  // UUID를 메시지로 전달 (필요에 따라)
+        };
+        sendMessage("stop", message);
+        dispose(streamUUID);  // UUID도 전달
     }
 }
 
-const dispose = () => {
-    if (webRtcPeer) {
-        webRtcPeer.dispose();
-        webRtcPeer = null;
+const dispose = (streamUUID) => {
+    if (webRtcPeer[streamUUID]) {
+        webRtcPeer[streamUUID].dispose();
+        delete webRtcPeer[streamUUID];
     }
     socket?.disconnect();
     hideSpinner(video);
@@ -141,6 +144,7 @@ const hideSpinner = (...arguments) => {
 
 const onError = (error) => {
     console.error(error)
+    Object.keys(webRtcPeer).forEach(stop);
     alert("error: ", error)
 }
 
@@ -153,13 +157,12 @@ socket.on('connect', function() {
 
 // 'connect_error' 이벤트는 연결에 오류가 발생했을 때 발생합니다.
 socket.on('connect_error', function(error) {
-    console.log(error)
-    stop()
+    console.log(error);
+    Object.keys(webRtcPeer).forEach(stop);
 });
 
-// 'disconnect' 이벤트는 클라이언트가 서버에서 연결이 끊어졌을 때 발생합니다.
 socket.on('disconnect', function() {
-    stop()
+    Object.keys(webRtcPeer).forEach(stop);
 });
 
 socket.on('error', (error) =>{
@@ -169,12 +172,13 @@ socket.on('error', (error) =>{
 socket.on('viewerResponse', viewerResponse);
 socket.on('stopCommunication', dispose);
 socket.on('iceCandidate', (data) => {
-    webRtcPeer.addIceCandidate(data.candidate);
+    webRtcPeer[data.streamUUID].addIceCandidate(data.candidate);
 });
 socket.on('rtcConnectResponse', (data) => {
     if(data.response === "success"){
 		console.log(data)
-		viewer(data.result.streaming_url, data.result.streaming_name)
+        document.getElementById('terminate').setAttribute('data-uuid', data.result.streamUUID);
+		viewer(data.result.streamUUID, data.result.streaming_url, data.result.streaming_name)
 	}else{
         console.log(data)
     }

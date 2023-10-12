@@ -30,6 +30,7 @@ const apiRoute = require('./routes/api');
 const manageRoute = require('./routes/manage');
 const { instrument } = require("@socket.io/admin-ui");
 const startScheduler = require('./scheduler/scheduler');
+const { v4: uuidv4 } = require('uuid');
 
 var argv = minimist(process.argv.slice(2), {
     default: {
@@ -42,6 +43,7 @@ var app = express();
 app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'static')));
+app.use('/recorders', express.static(path.join(__dirname, 'static', "recorders")));
 app.use('/bower_components', express.static(path.join(__dirname, 'static', "bower_components")));
 app.use('/api', apiRoute);
 app.use('/manage', manageRoute);
@@ -79,10 +81,9 @@ const sendMessage = (socket, id, message) =>{
 /*
  * Definition of global variables.
  */
-var idCounter = 0;
 var candidatesQueue = {};
 var kurentoClient = null;
-var viewers = [];
+var viewers = {};
 
 const checkTCPConnection = async (ip, port) => {
     return new Promise((resolve) => {
@@ -142,7 +143,7 @@ app.get('/health-check', async (req, res) => {
                     isOpen: connectionResult.isOpen,
                 };
             } else {
-                return { streaming_name: carId, message: "차량 매핑 테이블 없음", response : "fail" };
+                return { streaming_name: carId, message: "차량 매핑 테이블 없음", response : "error" };
             }
         }));
 
@@ -161,15 +162,7 @@ sequelize.sync()
         console.error("Failed to connect to the database:", error);
     });
 
-function nextUniqueId() {
-	idCounter++;
-	return idCounter.toString();
-}
-
 io.on('connection', (socket) => {
-    let sessionId = nextUniqueId();
-    console.log('Connection received with sessionId ' + sessionId);
-
     socket.on("rtcConnect", async(data) =>{
         if(data.streamingName === "" || !data.streamingName){
             const message = {
@@ -203,6 +196,8 @@ io.on('connection', (socket) => {
             sendMessage(socket, 'rtcConnectResponse', message)
             return;
         }
+        const streamUUID = uuidv4();
+        selectResult.dataValues.streamUUID = streamUUID
         const message = {
             response: 'success',
             message: "정상",
@@ -213,7 +208,8 @@ io.on('connection', (socket) => {
 
     socket.on('viewer', async (data) => {
         try {
-            console.log(data.streamingName)
+            //console.log(data)
+            const streamUUID = data.streamUUID
             if(data.streamingName === "" || !data.streamingName){
                 const message = {
                     response: 'rejected',
@@ -249,7 +245,7 @@ io.on('connection', (socket) => {
             const rtspIp = generateRtspEndpoint(data.rtspIp)
             const disasterNumber = data.disasterNumber
             const carNumber = data.carNumber
-            await startViewer(sessionId, socket, data.sdpOffer, rtspIp, disasterNumber, carNumber, data.streamingName, function(error, sdpAnswer) {
+            startViewer(streamUUID, socket, data.sdpOffer, rtspIp, disasterNumber, carNumber, data.streamingName, function(error, sdpAnswer) {
                 if(error) {
                     const message = {
                         response: 'rejected',
@@ -259,7 +255,8 @@ io.on('connection', (socket) => {
                 } else {
                     const message = {
                         response: 'accepted',
-                        sdpAnswer: sdpAnswer
+                        sdpAnswer: sdpAnswer,
+                        streamUUID : streamUUID
                     }
                     sendMessage(socket, 'viewerResponse', message)
                 }
@@ -274,12 +271,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('stop', () => {
-        stop(sessionId);
+    socket.on('stop', (data) => {
+        console.log(data)
+        stop(data.streamUUID);
     });
 
     socket.on('onIceCandidate', (data) => {
-        onIceCandidate(sessionId, data.candidate);
+        onIceCandidate(data.streamUUID, data.candidate);
     });
 });
 
@@ -289,7 +287,7 @@ io.on('connection', (socket) => {
  */
 
 // Recover kurentoClient for the first time.
-async function getKurentoClient(callback) {
+function getKurentoClient(callback) {
     if (kurentoClient !== null) {
         return callback(null, kurentoClient);
     }
@@ -307,37 +305,37 @@ async function getKurentoClient(callback) {
 }
 
 
-async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber, carNumber, streamingName, callback) {
+function startViewer(streamUUID, socket, sdpOffer, rtspUri, disasterNumber, carNumber, streamingName, callback) {
 
-    await clearCandidatesQueue(sessionId);
+    clearCandidatesQueue(streamUUID);
 
-    await getKurentoClient(async function(error, kurentoClient) {
+    getKurentoClient(function(error, kurentoClient) {
         if (error) {
-            stop(sessionId);
+            stop(streamUUID);
             return callback(error);
         }
 
-        await kurentoClient.create('MediaPipeline', async function(error, pipeline) {
+        kurentoClient.create('MediaPipeline', function(error, pipeline) {
             if (error) {
-                stop(sessionId);
+                stop(streamUUID);
                 return callback(error);
             }
 
-            await pipeline.create('PlayerEndpoint', {uri: rtspUri}, async function(error, player) {
+            pipeline.create('PlayerEndpoint', {uri: rtspUri}, function(error, player) {
                 if (error) {
-                    stop(sessionId);
+                    stop(streamUUID);
                     return callback(error);
                 }
 
-                await pipeline.create('WebRtcEndpoint', async function(error, webRtcEndpoint) {
+                pipeline.create('WebRtcEndpoint', function(error, webRtcEndpoint) {
                     if (error) {
-                        stop(sessionId);
+                        stop(streamUUID);
                         return callback(error);
                     }
 
-                    if (candidatesQueue[sessionId]) {
-                        while (candidatesQueue[sessionId].length) {
-                            var candidate = candidatesQueue[sessionId].shift();
+                    if (candidatesQueue[streamUUID]) {
+                        while (candidatesQueue[streamUUID].length) {
+                            var candidate = candidatesQueue[streamUUID].shift();
                             webRtcEndpoint.addIceCandidate(candidate);
                         }
                     }
@@ -345,28 +343,28 @@ async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber,
                     webRtcEndpoint.on('IceCandidateFound', async function(event) {
                         var candidate = kurento.getComplexType('IceCandidate')(event.candidate);
                         const message = {
-                            id: 'iceCandidate',
-                            candidate: candidate
+                            candidate: candidate,
+                            streamUUID : streamUUID
                         }
                         sendMessage(socket, 'iceCandidate', message)
                     });
 
-                    const recordUri = `file:///recorders/${getFormattedDate()}_${streamingName}_${disasterNumber}_${carNumber}_${sessionId}.webm`;
-                    await pipeline.create('RecorderEndpoint', {uri: recordUri, mediaProfile: 'WEBM_VIDEO_ONLY'}, async function(error, recorder) {
+                    const recordUri = `file:///recorders/${getFormattedDate()}_${streamingName}_${disasterNumber}_${carNumber}_${streamUUID}.webm`;
+                    pipeline.create('RecorderEndpoint', {uri: recordUri, mediaProfile: 'WEBM_VIDEO_ONLY'}, function(error, recorder) {
                         if (error) {
-                            stop(sessionId);
+                            stop(streamUUID);
                             return callback(error);
                         }
 
-                        viewers[sessionId] = {
+                        viewers[streamUUID] = {
                             webRtcEndpoint: webRtcEndpoint,
                             socket: socket,
                             recorder: recorder
                         };
 
-                        await player.connect(recorder, function(error) {
+                        player.connect(recorder, function(error) {
                             if (error) {
-                                stop(sessionId);
+                                stop(streamUUID);
                                 return callback(error);
                             }
                         });
@@ -388,43 +386,43 @@ async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber,
                             console.log("Paused",event)
                         })
 
-                        await webRtcEndpoint.on("MediaStateChanged", async function(event) {
+                        webRtcEndpoint.on("MediaStateChanged", function(event) {
                             //console.log("MediaStateChanged",event)
                             if ((event.oldState !== event.newState) && (event.newState === 'CONNECTED')) {
                                 recorder.record(function(error) {
                                     if (error) {
-                                        stop(sessionId);
+                                        stop(streamUUID);
                                         return callback(error);
                                     }
                                 });
                             }
                         });
 
-                        await webRtcEndpoint.processOffer(sdpOffer, async function(error, sdpAnswer) {
+                        webRtcEndpoint.processOffer(sdpOffer, function(error, sdpAnswer) {
                             if (error) {
-                                stop(sessionId);
+                                stop(streamUUID);
                                 return callback(error);
                             }
 
-                            await webRtcEndpoint.gatherCandidates(async function(error) {
+                            webRtcEndpoint.gatherCandidates(function(error) {
                                 if (error) {
-                                    stop(sessionId);
+                                    stop(streamUUID);
                                     return callback(error);
                                 }
 
-                                await player.connect(webRtcEndpoint, async function(error) {
+                                player.connect(webRtcEndpoint, function(error) {
                                     if (error) {
-                                        stop(sessionId);
+                                        stop(streamUUID);
                                         return callback(error);
                                     }
     
-                                    await player.play(async function(error) {
+                                    player.play(function(error) {
                                         if (error) {
-                                            stop(sessionId);
+                                            stop(streamUUID);
                                             return callback(error);
                                         }
     
-                                        await callback(null, sdpAnswer);
+                                        callback(null, sdpAnswer);
                                     });
                                 });
                             });
@@ -436,22 +434,22 @@ async function startViewer(sessionId, socket, sdpOffer, rtspUri, disasterNumber,
     });
 }
 
-async function clearCandidatesQueue(sessionId) {
-  if (candidatesQueue[sessionId]) {
-    delete candidatesQueue[sessionId];
+function clearCandidatesQueue(streamUUID) {
+  if (candidatesQueue[streamUUID]) {
+    delete candidatesQueue[streamUUID];
   }
 }
 
-function stop(sessionId) {
-    console.log("Stopping recorder for session:", sessionId);
-    if (viewers[sessionId]) {
-        viewers[sessionId].recorder.stop();
-        viewers[sessionId].recorder.release();
-        viewers[sessionId].webRtcEndpoint.release();
-        delete viewers[sessionId];
+function stop(streamUUID) {
+    console.log("Stopping recorder for session:", streamUUID);
+    if (viewers[streamUUID]) {
+        viewers[streamUUID].recorder?.stop();
+        viewers[streamUUID].recorder?.release();
+        viewers[streamUUID].webRtcEndpoint?.release();
+        delete viewers[streamUUID];
     }
 
-    clearCandidatesQueue(sessionId);
+    clearCandidatesQueue(streamUUID);
 
     if (viewers.length < 1) {
         console.log('Closing kurento client');
@@ -460,18 +458,18 @@ function stop(sessionId) {
     }
 }
 
-function onIceCandidate(sessionId, _candidate) {
+function onIceCandidate(streamUUID, _candidate) {
     var candidate = kurento.getComplexType('IceCandidate')(_candidate);
 
-    if (viewers[sessionId] && viewers[sessionId].webRtcEndpoint) {
+    if (viewers[streamUUID] && viewers[streamUUID].webRtcEndpoint) {
         //console.info('Sending viewer candidate');
-        viewers[sessionId].webRtcEndpoint.addIceCandidate(candidate);
+        viewers[streamUUID].webRtcEndpoint.addIceCandidate(candidate);
     }else {
         //console.info('Queueing candidate');
-        if (!candidatesQueue[sessionId]) {
-            candidatesQueue[sessionId] = [];
+        if (!candidatesQueue[streamUUID]) {
+            candidatesQueue[streamUUID] = [];
         }
-        candidatesQueue[sessionId].push(candidate);
+        candidatesQueue[streamUUID].push(candidate);
     }
 }
 

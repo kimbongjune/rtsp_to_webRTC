@@ -8,7 +8,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="bower_components/demo-console/index.css">
     <link rel="stylesheet" href="css/kurento.css">
 
     <script src="bower_components/webrtc-adapter/release/adapter.js"></script>
@@ -18,7 +17,7 @@
 
     <script src="bower_components/kurento-utils/js/kurento-utils.js"></script>
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js" integrity="sha384-c79GN5VsunZvi+Q/WObgk2in0CbZsHnjEqvFxC5DxHn9lTfNce2WW6h2pH6u/kF+" crossorigin="anonymous"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuidv4.min.js"></script>
     <script src="js/index.js"></script>
     <title>rtsp to webRTC</title>
   </head>
@@ -30,15 +29,10 @@
             <div class="col-md-12">
               <a id="viewer" href="#" class="btn btn-primary">
                 <span class="glyphicon glyphicon-user"></span> Viewer</a>
-              <a id="terminate" href="#" class="btn btn-danger">
+              <a id="terminate" href="#" class="btn btn-danger" data-uuid="">
                 <span class="glyphicon glyphicon-stop"></span> Stop</a><br><br>
                 <input type="text" id="streaming_name" value="test">
             </div>
-          </div>
-          <br/>
-          <label class="control-label" for="console">Console</label><br><br>
-          <div id="console" class="democonsole">
-            <ul></ul>
           </div>
         </div>
         <div class="col-md-7">

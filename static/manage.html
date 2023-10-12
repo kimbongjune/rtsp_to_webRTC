@@ -234,6 +234,10 @@ $(document).ready(async function () {
                 body.highlight( table.search() );  
             });
 
+            table.on('mouseenter', 'tr', function () {
+                console.log("??????????")
+            })
+
             table.on('mouseenter', 'td', function () {
                 let colIdx = table.cell(this).index().column;
             
@@ -249,6 +253,10 @@ $(document).ready(async function () {
             });
 
             table.on('click', 'tbody tr', (e) => {
+                if(e.currentTarget.children.length <= 1){
+                    return;
+                }
+                
                 let classList = e.currentTarget.classList;
             
                 if (classList.contains('selected')) {

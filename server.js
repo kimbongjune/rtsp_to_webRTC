@@ -152,12 +152,12 @@ app.get('/health-check', async (req, res) => {
             }
         });
 
-        console.log(results)
-
         const checkedResponses = await Promise.all(dataArray.map(async carId => {
             const found = results.find(result => result.streaming_name === carId);
+            console.log(found)
             if (found) {
-                const connectionResult = await checkTCPConnection(found.ip, RTSP_PORT);
+                const connectionResult = await checkTCPConnection(found.streaming_url, RTSP_PORT);
+                console.log(connectionResult)
                 return {
                     ...found.dataValues,
                     status: connectionResult.status,

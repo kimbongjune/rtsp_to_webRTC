@@ -1,7 +1,28 @@
+/**
+ * 
+ * node 스케줄러 파일
+ * 특정 주기로 동작하며 recorders 폴더 아래에 만료된 webm 영상을 삭제한다.
+ * 
+ * @author kbj.
+ * @since 2023-10-13
+ * @version 1.0.0
+ * 
+ * <pre>
+ * << 개정이력(Modefication Information) >>
+ *
+ * 수정일       		수정자      수정내용 
+ * ================================= 
+ * 2023-10-13   kbj.    최초생성 
+ *
+ * </pre>
+ *
+ */
+
 const schedule = require('node-schedule');
 const fs = require('fs');
 const path = require('path');
 
+//scheduleJob 리스너 함수 webm 영상 파일 생성 후 48시간이 경과된 영상파일을 삭제한다.
 const deleteOldFiles = () => {
     const directory = path.join(__dirname, "..", 'static', 'recorders');
 
@@ -31,7 +52,7 @@ const deleteOldFiles = () => {
     });
 }
 
-// 매일 정오에 실행되는 스케줄러
+//매일 자정 실행되는 스케줄러 등록 함수
 const startScheduler = () => {
     console.log("startScheduler")
     //schedule.scheduleJob('0 0 * * *', deleteOldFiles);

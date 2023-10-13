@@ -1,5 +1,26 @@
+/**
+ * 
+ * 데이터베이스 연결 설정 파일
+ * 시퀄라이저를 이용해 orm으로 데이터베이스를 접근한다.
+ * 
+ * @author kbj.
+ * @since 2023-10-13
+ * @version 1.0.0
+ * 
+ * <pre>
+ * << 개정이력(Modefication Information) >>
+ *
+ * 수정일       		수정자      수정내용 
+ * ================================= 
+ * 2023-10-13   kbj.    최초생성 
+ *
+ * </pre>
+ *
+ */
+
 const { Sequelize, DataTypes, Op } = require('sequelize');
 
+//시퀄라이저 인스턴스 생성
 const sequelize = new Sequelize('rtsp', 'root', 'qwer1234', {
     host: 'localhost',
     dialect: 'mysql',
@@ -13,6 +34,7 @@ const sequelize = new Sequelize('rtsp', 'root', 'qwer1234', {
       },
 });
 
+//테이블 정의
 const rtspTable = sequelize.define('t_rtsp', {
     streaming_name: {
         type: DataTypes.STRING,

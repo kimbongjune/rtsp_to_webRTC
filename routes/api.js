@@ -1,3 +1,23 @@
+/**
+ * 
+ * API 라우팅 파일
+ * 관리자 웹페이지에서 데이터를 조회하기 위해 사용함.
+ * 
+ * @author kbj.
+ * @since 2023-10-13
+ * @version 1.0.0
+ * 
+ * <pre>
+ * << 개정이력(Modefication Information) >>
+ *
+ * 수정일       		수정자      수정내용 
+ * ================================= 
+ * 2023-10-13   kbj.    최초생성 
+ *
+ * </pre>
+ *
+ */
+
 const express = require('express');
 const router = express.Router();
 const { sequelize, rtspTable, Op } = require('../db/db');
@@ -6,11 +26,12 @@ const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const existsSync = require('fs').existsSync;
 
-// ffmpeg와 ffprobe의 경로 설정
+//ffmpeg와 ffprobe의 경로 설정
 const ffmpegBinPath = path.join(__dirname, '..', 'ffmpeg');
 ffmpeg.setFfmpegPath(path.join(ffmpegBinPath, 'ffmpeg.exe'));
 ffmpeg.setFfprobePath(path.join(ffmpegBinPath, 'ffprobe.exe'));
 
+//데이터베이스에 존재하는 모든 rtsp 데이터를 조회한다.
 router.get('/rtsp-info', async (req, res) => {
     try {
         const results = await rtspTable.findAll();
@@ -22,6 +43,7 @@ router.get('/rtsp-info', async (req, res) => {
     }
 });
 
+//데이터베이스에 rtsp 데이터를 추가한다.
 router.post('/rtsp-info', async (req, res) => {
     try {
         const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password } = req.body;
@@ -40,6 +62,7 @@ router.post('/rtsp-info', async (req, res) => {
     }
 });
 
+//데이터베이스에 특정 rtsp 데이터를 삭제한다.
 router.delete('/rtsp-info', async (req, res) => {
     try {
         const streaming_name = req.body.streaming_name;
@@ -51,6 +74,7 @@ router.delete('/rtsp-info', async (req, res) => {
     }
 });
 
+//데이터베이스에 특정 rtsp 데이터를 수정한다.
 router.put('/rtsp-info', async (req, res) => {
     try {
         const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password } = req.body;
@@ -76,6 +100,7 @@ router.put('/rtsp-info', async (req, res) => {
     }
 });
 
+//recorers 폴더에 존재하는 모든 webm 영상 목록을 조회한다.
 router.get('/videos', async (req, res) => {
     const directoryPath = path.join(__dirname, "..", 'static', 'recorders');
 
@@ -120,6 +145,7 @@ router.get('/videos', async (req, res) => {
     }
 });
 
+//recorers 폴더에 존재하는 특정 webm 영상을 삭제한다.
 router.delete('/video', async (req, res) => {
     const fileName = req.body.fileName;
     if (!fileName) {
@@ -140,6 +166,7 @@ router.delete('/video', async (req, res) => {
     }
 })
 
+//webm 영상의 생성일, 만료일의 데이트 포맷을 변경하기 위한 함수
 function formatDate(date, optionalNumber = 0) {
     if(optionalNumber !== 0){
         date.setDate(date.getDate() + optionalNumber);
@@ -154,6 +181,7 @@ function formatDate(date, optionalNumber = 0) {
     return `${yyyy}년 ${mm}월 ${dd}일 ${hh}시 ${min}분 ${ss}초`;
 }
 
+//ffprobe를 이용해 webm 영상 길이를 조회하는 함수
 function getVideoDuration(filePath) {
     return new Promise((resolve, reject) => {
         ffmpeg.ffprobe(filePath, (err, metadata) => {
@@ -167,6 +195,7 @@ function getVideoDuration(filePath) {
     });
 }
 
+//webm 영상 길이의 포맷을 변경하기 위한 함수
 function formatDuration(seconds) {
     if(seconds == 0){
         return "파일손상(재생불가)"
@@ -188,6 +217,7 @@ function formatDuration(seconds) {
     return result.trim();
 }
 
+//webm 영상 크기의 포맷을 변경하기 위한 함수
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0) return '0 Bytes';
 

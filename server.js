@@ -1,17 +1,20 @@
-/*
- * (C) Copyright 2014-2015 Kurento (http://kurento.org/)
+/**
+ * 
+ * 영상 변환 서버 파일
+ * kurento media 서버와 통신하여 rtsp 영상을 webRTC로 변환한다.
+ * 
+ * @author kbj.
+ * @since 2023-10-13
+ * @version 1.0.0
+ * 
+ * <pre>
+ * << 개정이력(Modefication Information) >>
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * 수정일       		수정자      수정내용 
+ * ================================= 
+ * 2023-10-13   kbj.    최초생성 
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * </pre>
  *
  */
 
@@ -32,6 +35,7 @@ const { instrument } = require("@socket.io/admin-ui");
 const startScheduler = require('./scheduler/scheduler');
 const { v4: uuidv4 } = require('uuid');
 
+//npm 아규먼트
 var argv = minimist(process.argv.slice(2), {
     default: {
         as_uri: 'http://localhost:8443/',
@@ -42,49 +46,65 @@ var argv = minimist(process.argv.slice(2), {
 var app = express();
 app.use(bodyParser.json());
 app.use(cors());
+//정적 리소스 설정 /static : /
 app.use(express.static(path.join(__dirname, 'static')));
+//정적 리소스 설정 /static/recorders : /recorders
 app.use('/recorders', express.static(path.join(__dirname, 'static', "recorders")));
+//정적 리소스 설정 /static/recorders : /recorders
+app.use('/auth-test', express.static(path.join(__dirname, 'static', "decodeTest", "decode-test")));
+//정적 리소스 설정 /static/bower_components : /bower_components
 app.use('/bower_components', express.static(path.join(__dirname, 'static', "bower_components")));
-app.use('/api', apiRoute);
-app.use('/manage', manageRoute);
+//정적 리소스 설정 /static/node_modules/@socket.io/admin-ui/ui/dist/index.html : /socket-panel
 app.use('/socket-panel', express.static(path.join(__dirname, 'node_modules', '@socket.io', 'admin-ui', 'ui', 'dist')));
+//라우팅 설정 /api
+app.use('/api', apiRoute);
+//라우팅 설정 /manage
+app.use('/manage', manageRoute);
+
+//RTSP 포트
 const RTSP_PORT = 1935
 
+//express 서버 인스턴스 생성
 const server = http.createServer(app);
+//웹소켓 서버 설정
 const io = socketIo(server, {
     cors: {
-        origin: ["*", "https://admin.socket.io"],
+        origin: ["*"],
         credentials: true
     }
 });
 
+//socket.io admin 설정
 instrument(io, { 
     auth: false,
 });
 
-/*
- * Server startup
- */
+//express 서버 ip
 const asUrl = new URL(argv.as_uri);
+//express서버 port
 var port = asUrl.port;
 
+//express 서버 실행
 server.listen(port, function() {
     console.log('Kurento Tutorial started');
     console.log('Open ' + asUrl + ' with a WebRTC capable browser');
+    //저장 영상 삭제를 위한 스케줄러 실행
     startScheduler()
 });
 
+//소켓 메시지 전송 공통함수
 const sendMessage = (socket, id, message) =>{
     socket.emit(id, message);
 }
 
-/*
- * Definition of global variables.
- */
+//ICE Candidate 후보군을 관리하는 객체
 var candidatesQueue = {};
+//kurentoClient 인스턴스 객체
 var kurentoClient = null;
+//recorder, webRtcEndpoint, socket을 관리하는 객체
 var viewers = {};
 
+//rtsp 엔드포인트 tcp 헬스체크 함수
 const checkTCPConnection = async (ip, port) => {
     return new Promise((resolve) => {
         const client = new net.Socket();
@@ -119,6 +139,7 @@ const checkTCPConnection = async (ip, port) => {
 //         });
 //     });
 
+//헬스체크 API
 app.get('/health-check', async (req, res) => {
     const dataArray = req.query.carId.split(',').map(String) || [];
     console.log(dataArray)
@@ -154,6 +175,7 @@ app.get('/health-check', async (req, res) => {
     }
 });
 
+//시퀄라이저 인스턴스 생성
 sequelize.sync()
     .then(() => {
         console.log(`sequelize started`);
@@ -162,7 +184,9 @@ sequelize.sync()
         console.error("Failed to connect to the database:", error);
     });
 
+//웹소켓 연결 리스너
 io.on('connection', (socket) => {
+    //websocket rtcConnect 응답 처리 리스너, 무선호출명을 파라미터로 받아 데이터베이스를 조회하고 tcp 헬스체크를 진행함. 성공시 고유 UUID를 반환함.
     socket.on("rtcConnect", async(data) =>{
         if(data.streamingName === "" || !data.streamingName){
             const message = {
@@ -206,6 +230,7 @@ io.on('connection', (socket) => {
         sendMessage(socket, 'rtcConnectResponse', message)
     })
 
+    //websocket viewer 응답 처리 리스너, rtsp 영상을 쿠렌토 미디어 서버를 이용해 webRTC로 변환함
     socket.on('viewer', async (data) => {
         try {
             //console.log(data)
@@ -245,6 +270,7 @@ io.on('connection', (socket) => {
             const rtspIp = generateRtspEndpoint(data.rtspIp)
             const disasterNumber = data.disasterNumber
             const carNumber = data.carNumber
+            //영상 변환 시작
             startViewer(streamUUID, socket, data.sdpOffer, rtspIp, disasterNumber, carNumber, data.streamingName, function(error, sdpAnswer) {
                 if(error) {
                     const message = {
@@ -271,22 +297,20 @@ io.on('connection', (socket) => {
         }
     });
 
+    //websocket stop 응답 처리 리스너, webRTC peer와 미디어서버 인스턴스, recorder 연결을 정리함
     socket.on('stop', (data) => {
         console.log(data)
         stop(data.streamUUID);
     });
 
+    //websocket onIceCandidate 응답 처리 리스너, 클라이언트에서 전송한 ICE Candidate 후보군을 서버에 추가
     socket.on('onIceCandidate', (data) => {
         onIceCandidate(data.streamUUID, data.candidate);
     });
 });
 
 
-/*
- * Definition of functions
- */
-
-// Recover kurentoClient for the first time.
+//쿠렌토 미디어서버 인스턴스를 생성하는 함수(싱글톤)
 function getKurentoClient(callback) {
     if (kurentoClient !== null) {
         return callback(null, kurentoClient);
@@ -304,35 +328,41 @@ function getKurentoClient(callback) {
     });
 }
 
-
+//쿠렌토 미디어 서버에서 미디어 트랜스코딩 인스턴스를 시작하는 함수
 function startViewer(streamUUID, socket, sdpOffer, rtspUri, disasterNumber, carNumber, streamingName, callback) {
 
+    //ICE Candidate 후보군 정리
     clearCandidatesQueue(streamUUID);
 
+    //쿠렌토 미디어서버 인스턴스 생성
     getKurentoClient(function(error, kurentoClient) {
         if (error) {
             stop(streamUUID);
             return callback(error);
         }
 
+        //MediaPipeline 생성
         kurentoClient.create('MediaPipeline', function(error, pipeline) {
             if (error) {
                 stop(streamUUID);
                 return callback(error);
             }
 
+            //PlayerEndpoint 생성
             pipeline.create('PlayerEndpoint', {uri: rtspUri}, function(error, player) {
                 if (error) {
                     stop(streamUUID);
                     return callback(error);
                 }
 
+                //WebRtcEndpoint 생성
                 pipeline.create('WebRtcEndpoint', function(error, webRtcEndpoint) {
                     if (error) {
                         stop(streamUUID);
                         return callback(error);
                     }
 
+                    //ICE Candidate 후보군 추가
                     if (candidatesQueue[streamUUID]) {
                         while (candidatesQueue[streamUUID].length) {
                             var candidate = candidatesQueue[streamUUID].shift();
@@ -340,6 +370,7 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUri, disasterNumber, carN
                         }
                     }
 
+                    //ICE Candidate 후보군 탐색 완료 리스너, 클라이언트에 후보군을 전송함
                     webRtcEndpoint.on('IceCandidateFound', async function(event) {
                         var candidate = kurento.getComplexType('IceCandidate')(event.candidate);
                         const message = {
@@ -349,19 +380,24 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUri, disasterNumber, carN
                         sendMessage(socket, 'iceCandidate', message)
                     });
 
+                    //영상을 녹화하며, 저장하기위한 디렉토리 설정
                     const recordUri = `file:///recorders/${getFormattedDate()}_${streamingName}_${disasterNumber}_${carNumber}_${streamUUID}.webm`;
+
+                    //RecorderEndpoint 생성
                     pipeline.create('RecorderEndpoint', {uri: recordUri, mediaProfile: 'WEBM_VIDEO_ONLY'}, function(error, recorder) {
                         if (error) {
                             stop(streamUUID);
                             return callback(error);
                         }
 
+                        //viewers 객체에 webRtcEndpoint, socket, recorder 할당
                         viewers[streamUUID] = {
                             webRtcEndpoint: webRtcEndpoint,
                             socket: socket,
                             recorder: recorder
                         };
 
+                        //PlayerEndpoint에 recorderEndpoint 연결
                         player.connect(recorder, function(error) {
                             if (error) {
                                 stop(streamUUID);
@@ -369,23 +405,30 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUri, disasterNumber, carN
                             }
                         });
 
+                        //영상의 네트워크 전송 대역폭 설정
                         webRtcEndpoint.setMaxVideoSendBandwidth(2000);
                         webRtcEndpoint.setMinVideoSendBandwidth(500);
+
+                        //영상의 네트워크 수신 대역폭 설정
                         webRtcEndpoint.setMaxVideoRecvBandwidth(2000);
                         webRtcEndpoint.setMinVideoRecvBandwidth(500);
 
+                        //영상 녹화 시작 이벤트 리스너
                         recorder.on("Recording", function(event){
-                            //console.log("Recording",event)
+                            console.log("Recording",event)
                         })
 
+                        //영상 녹화 일시정지 이벤트 리스너
                         recorder.on("Paused", function(event){
                             console.log("Paused",event)
                         })
 
+                        //영상 녹화 중지 이벤트 리스너
                         recorder.on("Stopped", function(event){
                             console.log("Paused",event)
                         })
 
+                        //영상의 변환이 완료되어 상태값이 변경될 때 동작하는 리스너
                         webRtcEndpoint.on("MediaStateChanged", function(event) {
                             //console.log("MediaStateChanged",event)
                             if ((event.oldState !== event.newState) && (event.newState === 'CONNECTED')) {
@@ -398,24 +441,28 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUri, disasterNumber, carN
                             }
                         });
 
+                        //processOffer 생성 함수
                         webRtcEndpoint.processOffer(sdpOffer, function(error, sdpAnswer) {
                             if (error) {
                                 stop(streamUUID);
                                 return callback(error);
                             }
 
+                            //ICE Candidate 후보군 수집 리스너
                             webRtcEndpoint.gatherCandidates(function(error) {
                                 if (error) {
                                     stop(streamUUID);
                                     return callback(error);
                                 }
 
+                                //PlayerEndpoint에 webRtcEndpoint 연결
                                 player.connect(webRtcEndpoint, function(error) {
                                     if (error) {
                                         stop(streamUUID);
                                         return callback(error);
                                     }
     
+                                    //영상 재생 시작
                                     player.play(function(error) {
                                         if (error) {
                                             stop(streamUUID);
@@ -434,12 +481,14 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUri, disasterNumber, carN
     });
 }
 
+//ICE Candidate 후보군 정리 함수
 function clearCandidatesQueue(streamUUID) {
   if (candidatesQueue[streamUUID]) {
     delete candidatesQueue[streamUUID];
   }
 }
 
+//영상변환 중지 함수 webRTC peer와 미디어서버 인스턴스, recorder 연결을 정리
 function stop(streamUUID) {
     console.log("Stopping recorder for session:", streamUUID);
     if (viewers[streamUUID]) {
@@ -458,6 +507,7 @@ function stop(streamUUID) {
     }
 }
 
+//클라이언트에서 전송한 ICE Candidate 후보군을 서버에 추가하는 함수
 function onIceCandidate(streamUUID, _candidate) {
     var candidate = kurento.getComplexType('IceCandidate')(_candidate);
 
@@ -473,6 +523,7 @@ function onIceCandidate(streamUUID, _candidate) {
     }
 }
 
+//현재 날짜를 특정 포맷으로 변환하는 함수(yyyy_mm_dd-HH-MM-ss)
 function getFormattedDate() {
     const currentDate = new Date();
     const year = currentDate.getFullYear();
@@ -486,6 +537,7 @@ function getFormattedDate() {
     return `${year}_${month}_${day}-${hours}_${minutes}_${seconds}`;
 }
 
+//rtsp 아이피를 이용해 rtsp 영상의 엔드포인트 url을 생성하는 함수
 function generateRtspEndpoint(rtspIp){
     return `rtsp://${rtspIp}:${RTSP_PORT}/live/cctv002.stream`
 }

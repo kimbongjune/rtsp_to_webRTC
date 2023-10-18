@@ -57,18 +57,30 @@ const rtspTable = sequelize.define('t_rtsp', {
         type: DataTypes.STRING,
         allowNull: false
     },
-    createdAt: {
+    camera_type: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue : "kedacom"
+    },
+    camera_code: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue : 0
+    },
+    created_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        field: 'created_at'
+        defaultValue: Sequelize.fn("NOW"),
     },
-    updatedAt: {
+    updated_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        field: 'updated_at'
-    },
+        defaultValue: Sequelize.fn("NOW"),
+    }
 }, {
     tableName: 't_rtsp',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
         {
             unique: true,

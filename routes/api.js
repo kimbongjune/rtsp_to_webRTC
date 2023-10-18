@@ -24,7 +24,9 @@ const { sequelize, rtspTable, Op } = require('../db/db');
 const fs = require('fs').promises;
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
+const { default: axios } = require('axios');
 const existsSync = require('fs').existsSync;
+const {Base64, hex_md5} = require('./base64');
 
 //ffmpeg와 ffprobe의 경로 설정
 const ffmpegBinPath = path.join(__dirname, '..', 'ffmpeg');
@@ -46,14 +48,15 @@ router.get('/rtsp-info', async (req, res) => {
 //데이터베이스에 rtsp 데이터를 추가한다.
 router.post('/rtsp-info', async (req, res) => {
     try {
-        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password } = req.body;
+        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password, camera_type } = req.body;
         console.log(req.body)
         const createdData = await rtspTable.create({
             streaming_name: streaming_name,
             streaming_car_id: streaming_car_id,
             streaming_url: streaming_url,
             streaming_id: streaming_id,
-            streaming_password: streaming_password
+            streaming_password: streaming_password,
+            camera_type : camera_type
         });
         res.status(200).json({ message: "Data inserted successfully", data:createdData });
     } catch (error) {
@@ -77,13 +80,14 @@ router.delete('/rtsp-info', async (req, res) => {
 //데이터베이스에 특정 rtsp 데이터를 수정한다.
 router.put('/rtsp-info', async (req, res) => {
     try {
-        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password } = req.body;
+        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password, camera_type } = req.body;
         await rtspTable.update(
             {
                 streaming_car_id : streaming_car_id,
                 streaming_url : streaming_url,
                 streaming_id : streaming_id,
                 streaming_password : streaming_password,
+                camera_type : camera_type
             },
             {
                 where : {streaming_name: streaming_name}
@@ -166,6 +170,93 @@ router.delete('/video', async (req, res) => {
     }
 })
 
+router.get("/ptz", async (req, res) => {
+    try{
+        const {streamingName, id, password, authId, ptzEvent, ptzSpeed} = req.query;
+        console.log(streamingName, id, password, authId, ptzEvent, ptzSpeed)
+    
+        const streamingInformation = await rtspTable.findOne({
+            where: { streaming_name: streamingName }
+        });
+
+        //TODO 이노뎁, 세연 인포테크 등 ptz 요청 방식 확인
+        const ip = streamingInformation.dataValues.streaming_url
+        if(streamingInformation.dataValues.camera_type === "kedacom"){
+            const ptzData = {data : createKedacomPtzData(id, password, authId, ptzEvent, ptzSpeed)}
+            axios.post(`http://${ip}/kdsapi/video/ptz`,ptzData,{
+                headers : {
+                    "If-Modified-Since" :"0",
+                    "Content-Type":"application/xml"
+                }
+            })
+        }
+
+        /**
+         * 이노뎁
+         * ptz  : <contentroot><authenticationinfo type="7.0"><username>admin</username><password>NDczMTRiMDFmMTQ1OGY2NDc1Yjc2NGJjNTg1NTUyYjI=</password><authenticationid>569001199ccac3</authenticationid></authenticationinfo><PtzReq><NvrChnID>1</NvrChnID><CmdType>move_rightdown</CmdType><PanSpeed>50</PanSpeed><TilSpeed>50</TilSpeed></PtzReq></contentroot>
+         * stop : <contentroot><authenticationinfo type="7.0"><username>admin</username><password>NDczMTRiMDFmMTQ1OGY2NDc1Yjc2NGJjNTg1NTUyYjI=</password><authenticationid>569001199ccac3</authenticationid></authenticationinfo><PtzReq><NvrChnID>1</NvrChnID><CmdType>move_stop</CmdType><AddrNum>1</AddrNum></PtzReq></contentroot>
+         */
+
+        /**
+         * 세연
+         * ptz : /goform/app/FwPtzCtr?FwModId=0&PortId=0&PtzCode=0x108&PtzParm=10&FwCgiVer=0x0001
+         * stop : /goform/app/FwPtzCtr?FwModId=0&PortId=0&PtzCode=0x108&PtzParm=10&FwCgiVer=0x0001(PtzCode + 100)
+         * 좌상 : 0x106 / 0x206
+         * 상 : 0x107 / 0x207
+         * 우상 : 0x108 / 0x208
+         * 좌 : 0x103 / 0x203
+         * 우 : 0x105 / 0x205
+         * 좌하 : 0x100 / 0x200
+         * 하 : 0x101 / 0x201
+         * 우하 : 0x102 / 0x202
+         */
+ 
+        //특이 : 이노뎁의 김해동부-북부(펌프차_97거0144) (172.16.44.10) 인포스텍이랑 동일
+        //별도 비밀번호 암호화 로직과 인증 절차가 필요함
+        
+        res.status(200).json({data : "success"})
+    }catch(e){
+        console.log(e)
+        res.status(500).json({data : e})
+    }
+})
+
+router.get("/ptz-preset", async (req, res) => {
+    try{
+        const {streamingName, id, password, authId} = req.query;
+        console.log(streamingName, id, password, authId)
+    
+        const streamingInformation = await rtspTable.findOne({
+            where: { streaming_name: streamingName }
+        });
+
+        const ip = streamingInformation.dataValues.streaming_url
+        if(streamingInformation.dataValues.camera_type === "kedacom"){
+            const ptzData = {data : createKedacomPtzPresetData(id, password, authId)}
+            axios.post(`http://${ip}/kdsapi/video/ptz`,ptzData,{
+                headers : {
+                    "If-Modified-Since" :"0",
+                    "Content-Type":"application/xml"
+                }
+            })
+        }
+
+        /**
+         * 이노뎁
+         * preset : <contentroot><authenticationinfo type="7.0"><username>admin</username><password>NDczMTRiMDFmMTQ1OGY2NDc1Yjc2NGJjNTg1NTUyYjI=</password><authenticationid>569001199ccac3</authenticationid></authenticationinfo><PtzReq><NvrChnID>1</NvrChnID><CmdType>preset_load</CmdType><Number>0</Number></PtzReq></contentroot> 
+         */
+
+        /**
+         * 세연
+         * preset : goform/app/FwPtzCtr?FwModId=0&PortId=0&PtzCode=0x104&PtzParm=10&FwCgiVer=0x0001
+         */
+        res.status(200).json({data : "success"})
+    }catch(e){
+        console.log(e)
+        res.status(500).json({data : e})
+    }
+})
+
 //webm 영상의 생성일, 만료일의 데이트 포맷을 변경하기 위한 함수
 function formatDate(date, optionalNumber = 0) {
     if(optionalNumber !== 0){
@@ -228,6 +319,26 @@ function formatBytes(bytes, decimals = 2) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+const createKedacomPtzData = (id, password, authId, ptzEvent, speed = 50) =>{
+    return `<contentroot><authenticationinfo type='7.0'><username>${id}</username><password>${password}</password><authenticationid>${authId}</authenticationid></authenticationinfo><ptzparam xmlns='http://www.kedacom.com/ver10/XMLSchema' version='1.0'><ptzevent>${ptzEvent}</ptzevent><panspeed>${speed}</panspeed><tilspeed>${speed}</tilspeed></ptzparam></contentroot>`
+}
+
+const createInnodepPtzData = (id, password, authId, ptzEvent, speed = 50) =>{
+    if(ptzEvent === "move_stop"){
+        return `<contentroot><authenticationinfo type="7.0"><username>${id}</username><password>${password}</password><authenticationid>${authId}</authenticationid></authenticationinfo><PtzReq><NvrChnID>1</NvrChnID><CmdType>${ptzEvent}</CmdType><AddrNum>1</AddrNum></PtzReq></contentroot>`
+    }else{
+        return `<contentroot><authenticationinfo type="7.0"><username>${id}</username><password>${password}</password><authenticationid>${authId}</authenticationid></authenticationinfo><PtzReq><NvrChnID>1</NvrChnID><CmdType>${ptzEvent}</CmdType><PanSpeed>${speed}</PanSpeed><TilSpeed>${speed}</TilSpeed></PtzReq></contentroot>`
+    }
+}
+
+const createKedacomPtzPresetData = (id, password, authId) =>{
+    return `<contentroot><authenticationinfo type='7.0'><username>${id}</username><password>${password}</password><authenticationid>${authId}</authenticationid></authenticationinfo><ptzparam xmlns='http://www.kedacom.com/ver10/XMLSchema' version='1.0'><ptzevent>preset_load</ptzevent><preset>1</preset></ptzparam></contentroot>`
+}
+
+const createInnodepPtzPresetData = (id, password, authId) =>{
+    return `<contentroot><authenticationinfo type="7.0"><username>${id}</username><password>${password}</password><authenticationid>${authId}</authenticationid></authenticationinfo><PtzReq><NvrChnID>1</NvrChnID><CmdType>preset_load</CmdType><Number>0</Number></PtzReq></contentroot>`
 }
 
 module.exports = router;

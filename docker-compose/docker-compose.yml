@@ -6,7 +6,11 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - D:\vsCodeFile\rtsp_to_webRTC\static\recorders:/recorders
+      # 경남 
+      #- C:\Users\gnfire\Desktop\rtsp_to_webRTC\static\recorders:/recorders
+      # 회사
+      - D:\vsCodeFile\rtsp_to_webRTC_mod\rtsp_to_webRTC\static\recorders:/recorders
+      # 집 
       #- C:\dev_tool\github\rtsp_to_webRTC\rtsp_to_webRTC\static\recorders:/recorders
 
   db:

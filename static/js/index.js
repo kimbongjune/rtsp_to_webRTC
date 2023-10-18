@@ -25,6 +25,10 @@ let socket = io.connect(location.host);
 let video;
 //여러 WebRTC 피어를 관리할 객체
 let webRtcPeer = {}
+//영상 관련 데이터를 관리할 객체
+let cameraData = {}
+//ptz 클릭 제어를 위한 변수
+let isMouseDown = false
 
 //소켓 메시지 전송 공통함수
 const sendMessage = (id, message) =>{
@@ -47,32 +51,72 @@ window.onload = () => {
     });
 }
 
+//모든 피어 커넥션 종료
+const stopAllConnections = () =>{
+    Object.keys(webRtcPeer).forEach(stop)
+}
 
 //페이지 이동 이벤트(새로고침, 닫기, 페이지 이동)
 window.onbeforeunload = () => {
-    Object.keys(webRtcPeer).forEach(stop);  //모든 피어 커넥션 종료
+    stopAllConnections()  //모든 피어 커넥션 종료
 }
 
-//webRTC sdpAnswer 응답 함수
-const viewerResponse = (message) => {
-    if (message.response != 'accepted') {   //에러시 연결 종료
-        const errorMsg = message.message ? message.message : 'Unknow error';
-        console.log(message)
-        console.warn('Call not accepted for the following reason: ' + errorMsg);
-        dispose();
-    } else {    //정상 연결시 sdpAnswer를 webRtcPeer에 추가 및 재생
+//websocket 연결 성공 핸들러
+const socketConnectHandler = () =>{
+    console.log('Connected to the server.');
+    if(!socket){
+        socket = io.connect(location.host);
+    }
+}
+
+//websocket 연결 오류 핸들러
+const socketConnectionErrorHandler = (error) =>{
+    console.log(error);
+    stopAllConnections()
+}
+
+//websocket 연결 종료 핸들러
+const socketDisconnectHandler = () =>{
+    stopAllConnections()
+}
+
+//websocket ICE Candidate 응답 처리 핸들러
+const iceCandidateHandler = (data) =>{
+    webRtcPeer[data.streamUUID].addIceCandidate(data.candidate);
+}
+
+//websocket rtcConnect 응답 처리 핸들러
+const rtcConnectResponseHnadler = (data) =>{
+    if(data.response === "success"){
+		console.log(data)
+        if(!cameraData[data.result.streaming_name]){
+            cameraData[data.result.streaming_name] = data.result
+        }
+        document.getElementById('terminate').setAttribute('data-uuid', data.result.streamUUID);
+		viewer(data.result.streamUUID, data.result.streaming_url, data.result.streaming_name, data.result.streaming_id, data.result.streaming_password, data.result.streaming_car_id, data.result.camera_type)
+	}else{
+        stop(data.result.streamUUID)
+    }
+}
+
+//websocket viewerResponse 응답 처리 핸들러
+const viewerResponseHandler = (message) => {
+    if (message.response === 'success') {   
+        //정상 연결시 sdpAnswer를 webRtcPeer에 추가하고 영상을 재생
         webRtcPeer[message.streamUUID].processAnswer(message.sdpAnswer);
+    } else {    
+        //에러시 연결 종료
+        stop(message.streamUUID)
     }
 }
 
 //RTC 연결 요청 함수
 const rtcConnect = () =>{
     //중복 연결 방지
+    const streamingName = document.getElementById("streaming_name").value;  //무선호출명을 파라미터로 전송
     if (Object.values(webRtcPeer).some(peer => peer.streamingName === streamingName)) {
         return;
     }
-
-	const streamingName = document.getElementById("streaming_name").value;  //무선호출명을 파라미터로 전송
 
     //무선 호출명 빈 문자열 검증
     if (!streamingName) {
@@ -85,12 +129,14 @@ const rtcConnect = () =>{
         socket.connect();
     }
     
-    const message = {streamingName: streamingName}
+    const message = {
+        streamingName: streamingName
+    }
     sendMessage("rtcConnect", message)
 }
 
 //webRTC 연결 설정 함수
-const viewer = (streamUUID, rtspIp, streamingName) => {
+const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraType) => {
     //중복 연결 방지
     if (!webRtcPeer[streamUUID]) {
         showSpinner(video);
@@ -111,25 +157,32 @@ const viewer = (streamUUID, rtspIp, streamingName) => {
             if (error) return onError(error);
 
             //offer 생성
-            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName, streamUUID));
+            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraType));
         });
 
         //WebRTC 피어에 무선호출명 객체를 추가해 중복 호출 방지
-        webRtcPeer[streamUUID].streamingName = streamingName;
+        webRtcPeer[streamUUID].__proto__.streamingName = streamingName;
+    }else{
+        return;
     }
 }
 
 //offer를 서버에 전송
-const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID) => {
-    if (error) return onError(error);
+const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraType) => {
+    if (error) {
+        return onError(error);
+    }
 
     const message = {
         sdpOffer: offerSdp,
         rtspIp: rtspIp,
 		disasterNumber : "재난번호",
-		carNumber : "차량번호",
+		carNumber : carId,
         streamingName : streamingName,
-        streamUUID : streamUUID
+        streamingId : id,
+        streamingPassword : password,
+        streamUUID : streamUUID,
+        cameraType : cameraType
     }
     sendMessage("viewer", message)
 }
@@ -148,16 +201,17 @@ const stop = (streamUUID) => {
     console.log("Stopping stream with UUID:", streamUUID);
     if (webRtcPeer[streamUUID]) {
         const message = {
-            streamUUID: streamUUID  // UUID를 메시지로 전달 (필요에 따라)
+            streamUUID: streamUUID
         };
         sendMessage("stop", message);
-        dispose(streamUUID);  // UUID도 전달
+        dispose(streamUUID);
     }
 }
 
 //WebRTC 피어 및 소켓 정리 함수
 const dispose = (streamUUID) => {
     if (webRtcPeer[streamUUID]) {
+        delete cameraData[webRtcPeer[streamUUID].streamingName]
         webRtcPeer[streamUUID].dispose();
         delete webRtcPeer[streamUUID];
     }
@@ -185,54 +239,81 @@ const hideSpinner = (...arguments) => {
 const onError = (error) => {
     console.error(error)
     Object.keys(webRtcPeer).forEach(stop);
-    alert("error: ", error)
 }
 
-//websocket 연결 성공 리스너
-socket.on('connect', function() {
-    console.log('Connected to the server.');
-    if(!socket){
-        socket = io.connect(location.host);
+//ptz 컨트롤 api를 호출하는 함수
+const ptzStart = (e) =>{
+    //console.log(data)
+    isMouseDown = true
+    if(isMouseDown){
+        const data = cameraData[document.getElementById("streaming_name").value]
+        if(!data){
+            return
+        }
+        axios.get('/api/ptz',{
+            params :{
+                streamingName : data.streaming_name,
+                id : data.streaming_id,
+                password : data.encoded_password,
+                authId : data.authenticationid,
+                ptzEvent : e.getAttribute("id"),
+                ptzSpeed : 50
+            }
+        })
     }
-});
+}
 
-//websocket 연결 오류 리스너
-socket.on('connect_error', function(error) {
-    console.log(error);
-    Object.keys(webRtcPeer).forEach(stop);
-});
-
-//websocket 연결 종료 리스너
-socket.on('disconnect', function() {
-    Object.keys(webRtcPeer).forEach(stop);
-});
-
-//websocket 에러 리스너
-socket.on('error', (error) =>{
-	console.error(error)
-});
-
-//websocket viewerResponse 응답 처리 리스너, sdpAnswer를 가지고있음
-socket.on('viewerResponse', viewerResponse);
-
-//websocket error 응답 처리 리스너, 모든 피어 연결을 종료함
-socket.on('error', (data) =>{
-    console.log(data)
-    Object.keys(webRtcPeer).forEach(stop)
-});
-
-//websocket ICE Candidate 응답 처리 리스너, ICE Candidate 후보에 추가함
-socket.on('iceCandidate', (data) => {
-    webRtcPeer[data.streamUUID].addIceCandidate(data.candidate);
-});
-
-//websocket rtcConnect 응답 처리 리스너, 전송한 무선호출명에 대한 응답 파라미터를 가지고있음
-socket.on('rtcConnectResponse', (data) => {
-    if(data.response === "success"){
-		console.log(data)
-        document.getElementById('terminate').setAttribute('data-uuid', data.result.streamUUID);
-		viewer(data.result.streamUUID, data.result.streaming_url, data.result.streaming_name)
-	}else{
-        console.log(data)
+//ptz 프리셋 api를 호출하는 함수
+const presetLoad = (e) =>{
+    const data = cameraData[document.getElementById("streaming_name").value]
+    if(!data){
+        return
     }
-});
+    axios.get('/api/ptz-preset',{
+        params : {
+            streamingName : data.streaming_name,
+            id : data.streaming_id,
+            password : data.encoded_password,
+            authId : data.authenticationid,
+        }
+    })
+    isMouseDown = false
+}
+
+//ptz 중지 api를 호출하는 함수
+const ptzStop = (e) =>{
+    if(isMouseDown){
+        const data = cameraData[document.getElementById("streaming_name").value]
+        if(!data){
+            return
+        }
+        axios.get('/api/ptz',{
+            params :{
+                streamingName : data.streaming_name,
+                id : data.streaming_id,
+                password : data.encoded_password,
+                authId : data.authenticationid,
+                ptzEvent : "movestop"
+            }
+        })
+        isMouseDown = false
+    }
+}
+
+//websocket 연결 성공
+socket.on('connect', socketConnectHandler);
+
+//websocket 연결 오류
+socket.on('connect_error', socketConnectionErrorHandler);
+
+//websocket 연결 종료
+socket.on('disconnect', socketDisconnectHandler);
+
+//websocket viewerResponse 응답 처리
+socket.on('viewerResponse', viewerResponseHandler);
+
+//websocket ICE Candidate 응답 처리
+socket.on('iceCandidate', iceCandidateHandler);
+
+//websocket rtcConnect 응답 처리
+socket.on('rtcConnectResponse', rtcConnectResponseHnadler);

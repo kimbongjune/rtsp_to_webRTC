@@ -8,12 +8,12 @@
     <script src="/bower_components/jquery/dist/jquery.min.js"></script>
     <script src="/bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
     
-    <link href="https://cdn.datatables.net/v/bs5/jq-3.7.0/dt-1.13.6/datatables.min.css" rel="stylesheet">
+    <link href="../css/datatables.css" rel="stylesheet">
  
-    <link href="https://cdn.datatables.net/plug-ins/1.13.6/features/searchHighlight/dataTables.searchHighlight.css" rel="stylesheet">
-    <script src="https://cdn.datatables.net/v/bs5/jq-3.7.0/dt-1.13.6/datatables.min.js"></script>
-    <script src="https://bartaz.github.io/sandbox.js/jquery.highlight.js"></script>
-    <script src="https://cdn.datatables.net/plug-ins/1.13.6/features/searchHighlight/dataTables.searchHighlight.min.js"></script>
+    <link href="../css/datatables-search-highlight.css" rel="stylesheet">
+    <script src="../js/datatable.js"></script>
+    <script src="../js/jquery-highlight.js"></script>
+    <script src="../js/datatables-search-highlight.js"></script>
     <script src="/bower_components/axios/dist/axios.js"></script>
     <style>
         body{
@@ -61,6 +61,7 @@
                 <th>카메라 IP</th>
                 <th>카메라 ID</th>
                 <th>카메라 비밀번호</th>
+                <th>카메라 타입</th>
                 <th>생성일</th>
                 <th>수정일</th>
             </tr>
@@ -104,6 +105,12 @@
                     <label for="streaming_password" class="col-sm-4 col-form-label">카메라 비밀번호</label>
                     <div class="col-sm-8">
                         <input type="text" class="form-control" id="streaming_password">
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label for="camera_type" class="col-sm-4 col-form-label">카메라 타입</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" id="camera_type">
                     </div>
                 </div>
             </div>
@@ -154,6 +161,12 @@
                         <input type="text" class="form-control" id="streaming_password_modify">
                     </div>
                 </div>
+                <div class="mb-3 row">
+                    <label for="camera_type_modify" class="col-sm-4 col-form-label">카메라 타입</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" id="camera_type_modify">
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
@@ -188,6 +201,7 @@ $(document).ready(async function () {
         .then(function(response) {
             // 여기에서 response.data를 처리합니다.
             const rtspData = response.data;
+            console.log(rtspData)
             const tableBody = document.getElementById('rtsp_table').getElementsByTagName('tbody')[0];
                 rtspData.forEach(item => {
                 const row = tableBody.insertRow();
@@ -199,14 +213,16 @@ $(document).ready(async function () {
                 const cell5 = row.insertCell(4);
                 const cell6 = row.insertCell(5);
                 const cell7 = row.insertCell(6);
+                const cell8 = row.insertCell(7);
 
                 cell1.innerText = item.streaming_name;
                 cell2.innerText = item.streaming_car_id;
                 cell3.innerText = item.streaming_url;
                 cell4.innerText = item.streaming_id;
                 cell5.innerText = item.streaming_password;
-                cell6.innerText = item.createdAt;
-                cell7.innerText = item.updatedAt;
+                cell6.innerText = item.camera_type;
+                cell7.innerText = item.created_at;
+                cell8.innerText = item.updated_at;
             });
 
             table = $('#rtsp_table').DataTable({
@@ -239,7 +255,7 @@ $(document).ready(async function () {
             })
 
             table.on('mouseenter', 'td', function () {
-                let colIdx = table.cell(this).index().column;
+                let colIdx = table.cell(this)?.index().column;
             
                 table
                     .cells()
@@ -278,9 +294,10 @@ $(document).ready(async function () {
             const streaming_url = document.getElementById("streaming_url");
             const streaming_id = document.getElementById("streaming_id");
             const streaming_password = document.getElementById("streaming_password");
+            const camera_type = document.getElementById("camera_type");
 
             // 입력값 유효성 검사 및 포커스 설정
-            const inputs = [streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password];
+            const inputs = [streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password, camera_type];
             for(let input of inputs) {
                 if(!input.value) {
                     alert("모든 필드를 채워주세요!");
@@ -294,7 +311,8 @@ $(document).ready(async function () {
                 streaming_car_id: streaming_car_id.value,
                 streaming_url: streaming_url.value,
                 streaming_id: streaming_id.value,
-                streaming_password: streaming_password.value
+                streaming_password: streaming_password.value,
+                camera_type : camera_type.value
             };
 
             try {
@@ -305,6 +323,7 @@ $(document).ready(async function () {
                     // 모달 닫기
                     var myModal = bootstrap.Modal.getInstance(document.getElementById('rtspAddModal'));
                     myModal.hide();
+                    console.log(response.data.data)
                     addNewRow(response.data.data)
                     // 입력값 초기화
                     inputs.forEach(input => input.value = '');
@@ -316,7 +335,7 @@ $(document).ready(async function () {
 
         function addNewRow(data) {
             table.row
-                .add([data.streaming_name, data.streaming_car_id, data.streaming_url, data.streaming_id, data.streaming_password, data.createdAt, data.updatedAt])
+                .add([data.streaming_name, data.streaming_car_id, data.streaming_url, data.streaming_id, data.streaming_password, data.camera_type, data.created_at, data.updated_at])
                 .draw(false);
         }
 
@@ -328,8 +347,9 @@ $(document).ready(async function () {
                 data.streaming_url, 
                 data.streaming_id, 
                 data.streaming_password, 
-                data.createdAt, 
-                data.updatedAt
+                data.camera_type,
+                data.created_at, 
+                data.updated_at
             ];
             
             row.data(newData).draw();
@@ -353,14 +373,17 @@ $(document).ready(async function () {
             const streaming_url = document.getElementById("streaming_url_modify");
             const streaming_id = document.getElementById("streaming_id_modify");
             const streaming_password = document.getElementById("streaming_password_modify");
+            const camera_type = document.getElementById("camera_type_modify");
 
             const data = table.row('.selected').data()
+            console.log(data)
 
             streaming_name.value = data[0]
             streaming_car_id.value = data[1]
             streaming_url.value = data[2]
             streaming_id.value = data[3]
             streaming_password.value = data[4]
+            camera_type.value = data[5]
 
             const confirmModal = new bootstrap.Modal(document.getElementById('rtspModifyModal'));
             confirmModal.show();
@@ -372,9 +395,10 @@ $(document).ready(async function () {
             const streaming_url = document.getElementById("streaming_url_modify");
             const streaming_id = document.getElementById("streaming_id_modify");
             const streaming_password = document.getElementById("streaming_password_modify");
+            const camera_type = document.getElementById("camera_type_modify");
 
             // 입력값 유효성 검사 및 포커스 설정
-            const inputs = [streaming_car_id, streaming_url, streaming_id, streaming_password];
+            const inputs = [streaming_car_id, streaming_url, streaming_id, streaming_password, camera_type];
             for(let input of inputs) {
                 if(!input.value) {
                     alert("모든 필드를 채워주세요!");
@@ -388,7 +412,8 @@ $(document).ready(async function () {
                 streaming_car_id: streaming_car_id.value,
                 streaming_url: streaming_url.value,
                 streaming_id: streaming_id.value,
-                streaming_password: streaming_password.value
+                streaming_password: streaming_password.value,
+                camera_type : camera_type.value
             };
 
             try {

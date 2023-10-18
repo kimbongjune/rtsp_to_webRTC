@@ -8,6 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/bootstrap-icons-1.11.1/bootstrap-icons.css">
     <link rel="stylesheet" href="css/kurento.css">
 
     <script src="bower_components/webrtc-adapter/release/adapter.js"></script>
@@ -16,6 +17,7 @@
     <script src="bower_components/demo-console/index.js"></script>
     <script src="bower_components/kurento-utils/js/kurento-utils.js"></script>
     <script src="bower_components/socket.io/client-dist/socket.io.js"></script>
+    <script src="bower_components/axios/dist/axios.js"></script>
     <script src="js/index.js"></script>
     <title>rtsp to webRTC</title>
   </head>
@@ -32,7 +34,24 @@
                 <input type="text" id="streaming_name" value="test">
             </div>
           </div>
+          <br>
+          <div id="ptz-container">
+            <label class="control-label" for="control">ptz</label><br>
+            <div class="grid democonsol" id="control">
+              <button type="button" class="btn btn-outline-primary" id="move_leftup" onmousedown="ptzStart(this)" onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveup" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightup" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveleft" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="preset_load" onmousedown="presetLoad(this)"><i class="bi bi-arrow-clockwise"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveright" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_leftdown" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="movedown" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightdown" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-right"></i></button>
+            </div>
+          </div>
+          
         </div>
+        
         <div class="col-md-7">
           <div id="videoBig">
             <video id="video" autoplay controls preload="auto"width="640px" height="480px" data-setup="{}"></video>

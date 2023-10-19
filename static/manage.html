@@ -90,9 +90,9 @@
                   </div>
                 </div>
                 <div class="mb-3 row">
-                  <label for="streaming_url" class="col-sm-4 col-form-label">카메라 IP</label>
+                  <label for="streaming_ip" class="col-sm-4 col-form-label">카메라 IP</label>
                   <div class="col-sm-8">
-                    <input type="text" class="form-control" id="streaming_url">
+                    <input type="text" class="form-control" id="streaming_ip">
                   </div>
                 </div>
                 <div class="mb-3 row">
@@ -144,9 +144,9 @@
                   </div>
                 </div>
                 <div class="mb-3 row">
-                  <label for="streaming_url_modify" class="col-sm-4 col-form-label">카메라 IP</label>
+                  <label for="streaming_ip_modify" class="col-sm-4 col-form-label">카메라 IP</label>
                   <div class="col-sm-8">
-                    <input type="text" class="form-control" id="streaming_url_modify">
+                    <input type="text" class="form-control" id="streaming_ip_modify">
                   </div>
                 </div>
                 <div class="mb-3 row">
@@ -217,7 +217,7 @@ $(document).ready(async function () {
 
                 cell1.innerText = item.streaming_name;
                 cell2.innerText = item.streaming_car_id;
-                cell3.innerText = item.streaming_url;
+                cell3.innerText = item.streaming_ip;
                 cell4.innerText = item.streaming_id;
                 cell5.innerText = item.streaming_password;
                 cell6.innerText = item.camera_type;
@@ -291,13 +291,13 @@ $(document).ready(async function () {
         document.querySelector("#add-rtsp-info").addEventListener("click", async function() {
             const streaming_name = document.getElementById("streaming_name");
             const streaming_car_id = document.getElementById("streaming_car_id");
-            const streaming_url = document.getElementById("streaming_url");
+            const streaming_ip = document.getElementById("streaming_ip");
             const streaming_id = document.getElementById("streaming_id");
             const streaming_password = document.getElementById("streaming_password");
             const camera_type = document.getElementById("camera_type");
 
             // 입력값 유효성 검사 및 포커스 설정
-            const inputs = [streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password, camera_type];
+            const inputs = [streaming_name, streaming_car_id, streaming_ip, streaming_id, streaming_password, camera_type];
             for(let input of inputs) {
                 if(!input.value) {
                     alert("모든 필드를 채워주세요!");
@@ -309,7 +309,7 @@ $(document).ready(async function () {
             const data = {
                 streaming_name: streaming_name.value,
                 streaming_car_id: streaming_car_id.value,
-                streaming_url: streaming_url.value,
+                streaming_ip: streaming_ip.value,
                 streaming_id: streaming_id.value,
                 streaming_password: streaming_password.value,
                 camera_type : camera_type.value
@@ -335,7 +335,7 @@ $(document).ready(async function () {
 
         function addNewRow(data) {
             table.row
-                .add([data.streaming_name, data.streaming_car_id, data.streaming_url, data.streaming_id, data.streaming_password, data.camera_type, data.created_at, data.updated_at])
+                .add([data.streaming_name, data.streaming_car_id, data.streaming_ip, data.streaming_id, data.streaming_password, data.camera_type, data.created_at, data.updated_at])
                 .draw(false);
         }
 
@@ -344,7 +344,7 @@ $(document).ready(async function () {
             const newData = [
                 data.streaming_name, 
                 data.streaming_car_id, 
-                data.streaming_url, 
+                data.streaming_ip, 
                 data.streaming_id, 
                 data.streaming_password, 
                 data.camera_type,
@@ -370,7 +370,7 @@ $(document).ready(async function () {
 
             const streaming_name = document.getElementById("streaming_name_modify");
             const streaming_car_id = document.getElementById("streaming_car_id_modify");
-            const streaming_url = document.getElementById("streaming_url_modify");
+            const streaming_ip = document.getElementById("streaming_ip_modify");
             const streaming_id = document.getElementById("streaming_id_modify");
             const streaming_password = document.getElementById("streaming_password_modify");
             const camera_type = document.getElementById("camera_type_modify");
@@ -380,7 +380,7 @@ $(document).ready(async function () {
 
             streaming_name.value = data[0]
             streaming_car_id.value = data[1]
-            streaming_url.value = data[2]
+            streaming_ip.value = data[2]
             streaming_id.value = data[3]
             streaming_password.value = data[4]
             camera_type.value = data[5]
@@ -392,13 +392,13 @@ $(document).ready(async function () {
         document.getElementById("modify-rtsp-info").addEventListener("click", async function(){
             const streaming_name = document.getElementById("streaming_name_modify");
             const streaming_car_id = document.getElementById("streaming_car_id_modify");
-            const streaming_url = document.getElementById("streaming_url_modify");
+            const streaming_ip = document.getElementById("streaming_ip_modify");
             const streaming_id = document.getElementById("streaming_id_modify");
             const streaming_password = document.getElementById("streaming_password_modify");
             const camera_type = document.getElementById("camera_type_modify");
 
             // 입력값 유효성 검사 및 포커스 설정
-            const inputs = [streaming_car_id, streaming_url, streaming_id, streaming_password, camera_type];
+            const inputs = [streaming_car_id, streaming_ip, streaming_id, streaming_password, camera_type];
             for(let input of inputs) {
                 if(!input.value) {
                     alert("모든 필드를 채워주세요!");
@@ -410,7 +410,7 @@ $(document).ready(async function () {
             const data = {
                 streaming_name: streaming_name.value,
                 streaming_car_id: streaming_car_id.value,
-                streaming_url: streaming_url.value,
+                streaming_ip: streaming_ip.value,
                 streaming_id: streaming_id.value,
                 streaming_password: streaming_password.value,
                 camera_type : camera_type.value

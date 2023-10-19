@@ -24,6 +24,7 @@ const path = require('path');
 
 //scheduleJob 리스너 함수 webm 영상 파일 생성 후 48시간이 경과된 영상파일을 삭제한다.
 const deleteOldFiles = () => {
+    console.log("schedule works!")
     const directory = path.join(__dirname, "..", 'static', 'recorders');
 
     fs.readdir(directory, (err, files) => {
@@ -55,8 +56,10 @@ const deleteOldFiles = () => {
 //매일 자정 실행되는 스케줄러 등록 함수
 const startScheduler = () => {
     console.log("startScheduler")
-    //schedule.scheduleJob('0 0 * * *', deleteOldFiles);
-    schedule.scheduleJob('*/10 * * * * *', deleteOldFiles);
+    //매일 자정
+    schedule.scheduleJob('0 0 * * *', deleteOldFiles);
+    //10초마다(테스트용)
+    //schedule.scheduleJob('*/10 * * * * *', deleteOldFiles);
 }
 
 module.exports = startScheduler;

@@ -40,42 +40,49 @@ const rtspTable = sequelize.define('t_rtsp', {
         type: DataTypes.STRING,
         allowNull: false,
         primaryKey : true,
+        comment : "무선 호출명"
     },
     streaming_car_id: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        comment : "차량 번호"
     },
-    streaming_url: {
+    streaming_ip: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        comment : "카메라 IP"
     },
     streaming_id: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        comment : "카메라 게정 아이디"
     },
     streaming_password: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        comment : "카메라 게정 비밀번호"
     },
     camera_type: {
         type: DataTypes.STRING,
         allowNull: true,
-        defaultValue : "kedacom"
+        defaultValue : "kedacom",
+        comment : "뷰릭스 카메라 구분타입"
     },
     camera_code: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        defaultValue : 0
+        defaultValue : 0,
+        comment : "카메라 제조사 구분 코드"
     },
     created_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        defaultValue: Sequelize.fn("NOW"),
+        comment : "컬럼 생성일"
     },
     updated_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        defaultValue: Sequelize.fn("NOW"),
+        comment : "컬럼 수정일"
     }
 }, {
     tableName: 't_rtsp',
@@ -84,7 +91,7 @@ const rtspTable = sequelize.define('t_rtsp', {
     indexes: [
         {
             unique: true,
-            fields: ['streaming_name']
+            fields: ['streaming_name'],
         }
     ]
 });

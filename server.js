@@ -49,7 +49,7 @@ var argv = minimist(process.argv.slice(2), {
 var app = express();
 //bodyParser 미들웨어 추가 post 요청 데이터를 객체로 받기위해 사용
 app.use(bodyParser.json());
-//cors 미들웨어 추가 추후에 특정 ip만 허용하게 변경
+//cors 허용 IP 리스트. 추후에 특정 ip만 허용하게 변경
 const allowedOrigins = ['*'];
   
 app.use(cors(
@@ -73,15 +73,15 @@ app.use('/api', apiRoute);
 app.use('/manage', manageRoute);
 
 //RTSP 포트
-//const RTSP_PORT = 554
-const RTSP_PORT = 1935
+//const RTSP_PORT = 554 //운영용 포트
+const RTSP_PORT = 1935  //테스트용 포트
 
 //express 서버 인스턴스 생성
 const server = http.createServer(app);
 //웹소켓 서버 설정
 const io = socketIo(server, {
     cors: {
-        origin: ["*"],
+        origin: allowedOrigins,
         credentials: true
     }
 });
@@ -153,7 +153,15 @@ const checkTCPConnection = async (ip, port) => {
 
 //헬스체크 API
 app.get('/health-check', async (req, res) => {
-    const dataArray = req.query.carId.split(',').map(String) || [];
+    let dataArray = req.query.carId;
+    if (!dataArray) {
+        return res.status(400).send({response : "error", message: "필수 파라미터(carId) 누락" });
+    }
+
+    if (!Array.isArray(dataArray)) {
+        dataArray = [dataArray];
+    }
+
     console.log(dataArray)
     try {
         const results = await rtspTable.findAll({
@@ -166,24 +174,25 @@ app.get('/health-check', async (req, res) => {
 
         const checkedResponses = await Promise.all(dataArray.map(async carId => {
             const found = results.find(result => result.streaming_name === carId);
-            console.log(found)
+            //console.log(found)
             if (found) {
-                const connectionResult = await checkTCPConnection(found.streaming_url, RTSP_PORT);
+                const connectionResult = await checkTCPConnection(found.streaming_ip, RTSP_PORT);
                 console.log(connectionResult)
                 return {
                     ...found.dataValues,
                     status: connectionResult.status,
                     isOpen: connectionResult.isOpen,
+                    response : "success"
                 };
             } else {
-                return { streaming_name: carId, message: "차량 매핑 테이블 없음", response : "error" };
+                return { streaming_name: carId, message: `${carId} 차량에 대한 매핑 데이터가 없음`, response : "error" };
             }
         }));
 
         res.json(checkedResponses);
         
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({response : "error", message: error.message });
     }
 });
 
@@ -201,6 +210,7 @@ io.on('connection', (socket) => {
     //websocket rtcConnect 응답 처리 리스너, 무선호출명을 파라미터로 받아 데이터베이스를 조회하고 tcp 헬스체크를 진행함. 성공시 고유 UUID를 반환함.
     socket.on("rtcConnect", async(data) =>{
         try {
+            console.log(data)
             if(data.streamingName === "" || !data.streamingName){
                 const message = {
                     response: 'error',
@@ -216,19 +226,19 @@ io.on('connection', (socket) => {
             if(!selectResult) {
                 const message = {
                     response: 'error',
-                    message: "차량 정보 없음"
+                    message: `${data.streamingName} 차량에 대한 매핑 데이터가 없음`
                 }
                 sendMessage(socket, 'rtcConnectResponse', message)
                 return;
             }
 
-            const rtspIP = selectResult.streaming_url;
+            const rtspIP = selectResult.streaming_ip;
             const healthCheckResult = await checkTCPConnection(rtspIP, RTSP_PORT);
 
             if(!healthCheckResult.isOpen) {
                 const message = {
                     response: 'error',
-                    message: "차량 카메라가 꺼져있음"
+                    message: `${data.streamingName} 차량의 카메라가 꺼져있음`
                 }
                 sendMessage(socket, 'rtcConnectResponse', message)
                 return;
@@ -239,7 +249,7 @@ io.on('connection', (socket) => {
             // 이노뎁 /nvrcgi/system/GetAuthenticationid
             //TODO 이노뎁, 세연 인포테크 등 인증 로직 추가 및 url 확인
             if(selectResult.dataValues.camera_type === "kedacom"){
-                authData = await axios.get(`http://${selectResult.dataValues.streaming_url}/kdsapi/link/authenticationid`,{
+                authData = await axios.get(`http://${selectResult.dataValues.streaming_ip}/kdsapi/link/authenticationid`,{
                     headers : {
                         "If-Modified-Since" :"0"
                     }
@@ -256,7 +266,7 @@ io.on('connection', (socket) => {
                 }else{
                     const message = {
                         response: 'error',
-                        message: "카메라 계정인증 실패"
+                        message: `${data.streamingName} 차량의 카메라 계정인증 실패`
                     }
                     sendMessage(socket, 'rtcConnectResponse', message)
                     return;
@@ -271,15 +281,14 @@ io.on('connection', (socket) => {
             
             const message = {
                 response: 'success',
-                message: "정상",
+                message: "차량 연결 성공",
                 result : selectResult.dataValues
             }
             sendMessage(socket, 'rtcConnectResponse', message)
         }catch(error){
             const message = {
                 response: 'error',
-                message: "정상",
-                result : error
+                message: "알 수 없는 에러 :"+error
             }
             sendMessage(socket, 'rtcConnectResponse', message)
         }
@@ -368,7 +377,7 @@ io.on('connection', (socket) => {
             console.log(error);
             const message = {
                 response: 'error',
-                message: error
+                message: "알 수 없는 에러 : "+error
             }
             sendMessage(socket, 'viewerResponse', message)
         }

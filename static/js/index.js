@@ -67,7 +67,7 @@ window.onload = () => {
         
             const a = document.createElement('a');
             a.href = dataURL;
-            a.download = `${getFormattedDate()}_${data?.streaming_car_id}_${data?.streamUUID}.png;`
+            a.download = `${getFormattedDate()}_${data?.streaming_car_id}_${data?.streamUUID}.png`
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

@@ -49,6 +49,33 @@ window.onload = () => {
             stop(uuid); //연결 종료
         }
     });
+
+    document.getElementById('capture').addEventListener('click', function() { 
+        const video = document.getElementById('video');
+
+        if(!video.paused){
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            const data = cameraData[document.getElementById("streaming_name").value]
+    
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        
+            const dataURL = canvas.toDataURL('image/png');
+        
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.download = `${getFormattedDate()}_${data?.streaming_car_id}_${data?.streamUUID}.png;`
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            canvas.remove();
+        }else{
+            console.log("비디오 없음")
+        }
+    });
 }
 
 //모든 피어 커넥션 종료
@@ -93,9 +120,10 @@ const rtcConnectResponseHnadler = (data) =>{
             cameraData[data.result.streaming_name] = data.result
         }
         document.getElementById('terminate').setAttribute('data-uuid', data.result.streamUUID);
-		viewer(data.result.streamUUID, data.result.streaming_url, data.result.streaming_name, data.result.streaming_id, data.result.streaming_password, data.result.streaming_car_id, data.result.camera_type)
+		viewer(data.result.streamUUID, data.result.streaming_ip, data.result.streaming_name, data.result.streaming_id, data.result.streaming_password, data.result.streaming_car_id, data.result.camera_type)
 	}else{
-        stop(data.result.streamUUID)
+        console.log(data)
+        return;
     }
 }
 
@@ -298,6 +326,20 @@ const ptzStop = (e) =>{
         })
         isMouseDown = false
     }
+}
+
+//현재 날짜를 특정 포맷으로 변환하는 함수(yyyy_mm_dd-HH-MM-ss)
+function getFormattedDate() {
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // 1~12
+    const day = String(currentDate.getDate()).padStart(2, '0'); // 1~31
+
+    const hours = String(currentDate.getHours()).padStart(2, '0');
+    const minutes = String(currentDate.getMinutes()).padStart(2, '0');
+    const seconds = String(currentDate.getSeconds()).padStart(2, '0');
+
+    return `${year}_${month}_${day}-${hours}_${minutes}_${seconds}`;
 }
 
 //websocket 연결 성공

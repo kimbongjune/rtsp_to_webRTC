@@ -48,12 +48,12 @@ router.get('/rtsp-info', async (req, res) => {
 //데이터베이스에 rtsp 데이터를 추가한다.
 router.post('/rtsp-info', async (req, res) => {
     try {
-        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password, camera_type } = req.body;
+        const { streaming_name, streaming_car_id, streaming_ip, streaming_id, streaming_password, camera_type } = req.body;
         console.log(req.body)
         const createdData = await rtspTable.create({
             streaming_name: streaming_name,
             streaming_car_id: streaming_car_id,
-            streaming_url: streaming_url,
+            streaming_ip: streaming_ip,
             streaming_id: streaming_id,
             streaming_password: streaming_password,
             camera_type : camera_type
@@ -80,11 +80,11 @@ router.delete('/rtsp-info', async (req, res) => {
 //데이터베이스에 특정 rtsp 데이터를 수정한다.
 router.put('/rtsp-info', async (req, res) => {
     try {
-        const { streaming_name, streaming_car_id, streaming_url, streaming_id, streaming_password, camera_type } = req.body;
+        const { streaming_name, streaming_car_id, streaming_ip, streaming_id, streaming_password, camera_type } = req.body;
         await rtspTable.update(
             {
                 streaming_car_id : streaming_car_id,
-                streaming_url : streaming_url,
+                streaming_ip : streaming_ip,
                 streaming_id : streaming_id,
                 streaming_password : streaming_password,
                 camera_type : camera_type
@@ -180,7 +180,7 @@ router.get("/ptz", async (req, res) => {
         });
 
         //TODO 이노뎁, 세연 인포테크 등 ptz 요청 방식 확인
-        const ip = streamingInformation.dataValues.streaming_url
+        const ip = streamingInformation.dataValues.streaming_ip
         if(streamingInformation.dataValues.camera_type === "kedacom"){
             const ptzData = {data : createKedacomPtzData(id, password, authId, ptzEvent, ptzSpeed)}
             axios.post(`http://${ip}/kdsapi/video/ptz`,ptzData,{
@@ -230,7 +230,7 @@ router.get("/ptz-preset", async (req, res) => {
             where: { streaming_name: streamingName }
         });
 
-        const ip = streamingInformation.dataValues.streaming_url
+        const ip = streamingInformation.dataValues.streaming_ip
         if(streamingInformation.dataValues.camera_type === "kedacom"){
             const ptzData = {data : createKedacomPtzPresetData(id, password, authId)}
             axios.post(`http://${ip}/kdsapi/video/ptz`,ptzData,{

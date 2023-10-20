@@ -61,7 +61,8 @@
                 <th>카메라 IP</th>
                 <th>카메라 ID</th>
                 <th>카메라 비밀번호</th>
-                <th>카메라 타입</th>
+                <th>뷰릭스 카메라 타입</th>
+                <th>카메라 코드(홈페이지)</th>
                 <th>생성일</th>
                 <th>수정일</th>
             </tr>
@@ -108,9 +109,15 @@
                     </div>
                 </div>
                 <div class="mb-3 row">
-                    <label for="camera_type" class="col-sm-4 col-form-label">카메라 타입</label>
+                    <label for="camera_type" class="col-sm-4 col-form-label">뷰릭스 카메라 타입</label>
                     <div class="col-sm-8">
                         <input type="text" class="form-control" id="camera_type">
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label for="camera_code" class="col-sm-4 col-form-label">카메라 코드</label>
+                    <div class="col-sm-8">
+                        <input type="number" class="form-control" id="camera_code">
                     </div>
                 </div>
             </div>
@@ -162,9 +169,15 @@
                     </div>
                 </div>
                 <div class="mb-3 row">
-                    <label for="camera_type_modify" class="col-sm-4 col-form-label">카메라 타입</label>
+                    <label for="camera_type_modify" class="col-sm-4 col-form-label">뷰릭스 카메라 타입</label>
                     <div class="col-sm-8">
                         <input type="text" class="form-control" id="camera_type_modify">
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label for="camera_code_modify" class="col-sm-4 col-form-label">카메라 코드</label>
+                    <div class="col-sm-8">
+                        <input type="number" class="form-control" id="camera_code_modify">
                     </div>
                 </div>
             </div>
@@ -214,6 +227,7 @@ $(document).ready(async function () {
                 const cell6 = row.insertCell(5);
                 const cell7 = row.insertCell(6);
                 const cell8 = row.insertCell(7);
+                const cell9 = row.insertCell(8);
 
                 cell1.innerText = item.streaming_name;
                 cell2.innerText = item.streaming_car_id;
@@ -221,8 +235,9 @@ $(document).ready(async function () {
                 cell4.innerText = item.streaming_id;
                 cell5.innerText = item.streaming_password;
                 cell6.innerText = item.camera_type;
-                cell7.innerText = item.created_at;
-                cell8.innerText = item.updated_at;
+                cell7.innerText = item.camera_code;
+                cell8.innerText = item.created_at;
+                cell9.innerText = item.updated_at;
             });
 
             table = $('#rtsp_table').DataTable({
@@ -240,7 +255,9 @@ $(document).ready(async function () {
                     },
                     "zeroRecords" : "검색결과가 없습니다.",
                     "infoFiltered" : "(총 _MAX_ 개 항목중 필터링됨)",
-                }
+                },
+                order: [[7, 'desc']],
+                ordering: true,
             });
 
             table.on('draw', function () {
@@ -295,9 +312,10 @@ $(document).ready(async function () {
             const streaming_id = document.getElementById("streaming_id");
             const streaming_password = document.getElementById("streaming_password");
             const camera_type = document.getElementById("camera_type");
+            const camera_code = document.getElementById("camera_code");
 
             // 입력값 유효성 검사 및 포커스 설정
-            const inputs = [streaming_name, streaming_car_id, streaming_ip, streaming_id, streaming_password, camera_type];
+            const inputs = [streaming_name, streaming_car_id, streaming_ip, streaming_id, streaming_password, camera_type, camera_code];
             for(let input of inputs) {
                 if(!input.value) {
                     alert("모든 필드를 채워주세요!");
@@ -306,13 +324,19 @@ $(document).ready(async function () {
                 }
             }
 
+            if(!typeof camera_code === "number"){
+                alert("카메라 코드는 숫자만 입력이 가능합니다.");
+                camera_code.focus
+            }
+
             const data = {
                 streaming_name: streaming_name.value,
                 streaming_car_id: streaming_car_id.value,
                 streaming_ip: streaming_ip.value,
                 streaming_id: streaming_id.value,
                 streaming_password: streaming_password.value,
-                camera_type : camera_type.value
+                camera_type : camera_type.value,
+                camera_code : camera_code.value
             };
 
             try {
@@ -335,7 +359,7 @@ $(document).ready(async function () {
 
         function addNewRow(data) {
             table.row
-                .add([data.streaming_name, data.streaming_car_id, data.streaming_ip, data.streaming_id, data.streaming_password, data.camera_type, data.created_at, data.updated_at])
+                .add([data.streaming_name, data.streaming_car_id, data.streaming_ip, data.streaming_id, data.streaming_password, data.camera_type, data.camera_code, data.created_at, data.updated_at])
                 .draw(false);
         }
 
@@ -348,8 +372,9 @@ $(document).ready(async function () {
                 data.streaming_id, 
                 data.streaming_password, 
                 data.camera_type,
+                data.camera_code,
                 data.created_at, 
-                data.updated_at
+                data.updated_at,
             ];
             
             row.data(newData).draw();
@@ -374,6 +399,7 @@ $(document).ready(async function () {
             const streaming_id = document.getElementById("streaming_id_modify");
             const streaming_password = document.getElementById("streaming_password_modify");
             const camera_type = document.getElementById("camera_type_modify");
+            const camera_code = document.getElementById("camera_code_modify");
 
             const data = table.row('.selected').data()
             console.log(data)
@@ -384,6 +410,7 @@ $(document).ready(async function () {
             streaming_id.value = data[3]
             streaming_password.value = data[4]
             camera_type.value = data[5]
+            camera_code.value = data[6]
 
             const confirmModal = new bootstrap.Modal(document.getElementById('rtspModifyModal'));
             confirmModal.show();
@@ -396,9 +423,10 @@ $(document).ready(async function () {
             const streaming_id = document.getElementById("streaming_id_modify");
             const streaming_password = document.getElementById("streaming_password_modify");
             const camera_type = document.getElementById("camera_type_modify");
+            const camera_code = document.getElementById("camera_code_modify");
 
             // 입력값 유효성 검사 및 포커스 설정
-            const inputs = [streaming_car_id, streaming_ip, streaming_id, streaming_password, camera_type];
+            const inputs = [streaming_car_id, streaming_ip, streaming_id, streaming_password, camera_type, camera_code];
             for(let input of inputs) {
                 if(!input.value) {
                     alert("모든 필드를 채워주세요!");
@@ -407,13 +435,19 @@ $(document).ready(async function () {
                 }
             }
 
+            if(!typeof camera_code === "number"){
+                alert("카메라 코드는 숫자만 입력이 가능합니다.");
+                camera_code.focus
+            }
+
             const data = {
                 streaming_name: streaming_name.value,
                 streaming_car_id: streaming_car_id.value,
                 streaming_ip: streaming_ip.value,
                 streaming_id: streaming_id.value,
                 streaming_password: streaming_password.value,
-                camera_type : camera_type.value
+                camera_type : camera_type.value,
+                camera_code : camera_code.value
             };
 
             try {

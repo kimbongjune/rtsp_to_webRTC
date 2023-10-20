@@ -4,25 +4,19 @@ services:
   kurento:
     image: preinstalled-curento-media-server:latest
     ports:
-      - "8888:8888"
+      - "${KURENTO_PORT}:8888"
     volumes:
-      # 경남 
-      #- C:\Users\gnfire\Desktop\rtsp_to_webRTC\static\recorders:/recorders
-      # 회사
-      - D:\vsCodeFile\rtsp_to_webRTC_mod\rtsp_to_webRTC\static\recorders:/recorders
-      # 집 
-      #- C:\dev_tool\github\rtsp_to_webRTC\rtsp_to_webRTC\static\recorders:/recorders
+      - ${KURENTO_MOUNT_VOLUME_PATH}:/recorders
 
   db:
     image: mysql:latest
     ports:
-      - "3307:3306"
-      #- "3308:3306"
+      - "${MYSQL_PORT}:3306"
     command: --default-authentication-plugin=mysql_native_password
     environment:
-      MYSQL_DATABASE: rtsp
-      MYSQL_ROOT_PASSWORD: qwer1234
-      TZ: Asia/Seoul
+      MYSQL_DATABASE: ${MYSQL_DATABASE_NAME}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_USER_PASSWORD}
+      TZ: ${MYSQL_TIME_ZONE}
     volumes:
       - mysql-data:/var/lib/mysql
 

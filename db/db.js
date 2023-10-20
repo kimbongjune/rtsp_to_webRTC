@@ -10,21 +10,31 @@
  * <pre>
  * << 개정이력(Modefication Information) >>
  *
- * 수정일       		수정자      수정내용 
- * ================================= 
- * 2023-10-13   kbj.    최초생성 
- *
+ * 수정일       수정자      수정내용 
+ * ==========================================
+ * 2023-10-13    kbj       최초생성 
+ * 2023-10-20    kbj       외부 환경변수 적용       
  * </pre>
  *
  */
 
 const { Sequelize, DataTypes, Op } = require('sequelize');
+const dotenv = require('dotenv');
+
+// 루트 디렉토리의 .env 파일 경로를 지정하여 로드
+dotenv.config({ path: `${__dirname}/../.env` });
+
+const DATABASE_NAME = process.env.MYSQL_DATABASE_NAME
+const USER_NAME = process.env.MYSQL_USER_NAME
+const USER_PASSWORD = process.env.MYSQL_USER_PASSWORD
+const PORT = process.env.MYSQL_PORT
+const TABLE_NAME = process.env.MYSQL_RTSP_TABLE_NAME
 
 //시퀄라이저 인스턴스 생성
-const sequelize = new Sequelize('rtsp', 'root', 'qwer1234', {
+const sequelize = new Sequelize(DATABASE_NAME, USER_NAME, USER_PASSWORD, {
     host: 'localhost',
     dialect: 'mysql',
-    port : '3307',
+    port : PORT,
     logging: false,
     pool: {
         max: 5,          // 최대 커넥션 수
@@ -35,7 +45,7 @@ const sequelize = new Sequelize('rtsp', 'root', 'qwer1234', {
 });
 
 //테이블 정의
-const rtspTable = sequelize.define('t_rtsp', {
+const rtspTable = sequelize.define(TABLE_NAME, {
     streaming_name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -72,7 +82,7 @@ const rtspTable = sequelize.define('t_rtsp', {
         type: DataTypes.INTEGER,
         allowNull: true,
         defaultValue : 0,
-        comment : "카메라 제조사 구분 코드"
+        comment : "카메라 구분 코드"
     },
     created_at: {
         type: DataTypes.DATE,

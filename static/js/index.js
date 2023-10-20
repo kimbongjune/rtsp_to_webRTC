@@ -120,7 +120,7 @@ const rtcConnectResponseHnadler = (data) =>{
             cameraData[data.result.streaming_name] = data.result
         }
         document.getElementById('terminate').setAttribute('data-uuid', data.result.streamUUID);
-		viewer(data.result.streamUUID, data.result.streaming_ip, data.result.streaming_name, data.result.streaming_id, data.result.streaming_password, data.result.streaming_car_id, data.result.camera_type)
+		viewer(data.result.streamUUID, data.result.streaming_ip, data.result.streaming_name, data.result.streaming_id, data.result.streaming_password, data.result.streaming_car_id, data.result.camera_code)
 	}else{
         console.log(data)
         return;
@@ -164,7 +164,7 @@ const rtcConnect = () =>{
 }
 
 //webRTC 연결 설정 함수
-const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraType) => {
+const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraCode) => {
     //중복 연결 방지
     if (!webRtcPeer[streamUUID]) {
         showSpinner(video);
@@ -185,7 +185,7 @@ const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraTy
             if (error) return onError(error);
 
             //offer 생성
-            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraType));
+            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraCode));
         });
 
         //WebRTC 피어에 무선호출명 객체를 추가해 중복 호출 방지
@@ -196,7 +196,7 @@ const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraTy
 }
 
 //offer를 서버에 전송
-const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraType) => {
+const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraCode) => {
     if (error) {
         return onError(error);
     }
@@ -210,7 +210,7 @@ const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID, id, p
         streamingId : id,
         streamingPassword : password,
         streamUUID : streamUUID,
-        cameraType : cameraType
+        cameraCode : cameraCode
     }
     sendMessage("viewer", message)
 }

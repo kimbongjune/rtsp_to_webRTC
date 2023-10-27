@@ -113,7 +113,7 @@ const iceCandidateHandler = (data) =>{
 }
 
 //websocket rtcConnect 응답 처리 핸들러
-const rtcConnectResponseHnadler = (data) =>{
+const rtcConnectResponseHandler = (data) =>{
     if(data.response === "success"){
 		console.log(data)
         if(!cameraData[data.result.streaming_name]){
@@ -134,6 +134,7 @@ const viewerResponseHandler = (message) => {
         webRtcPeer[message.streamUUID].processAnswer(message.sdpAnswer);
     } else {    
         //에러시 연결 종료
+        console.log(message)
         stop(message.streamUUID)
     }
 }
@@ -148,7 +149,7 @@ const rtcConnect = () =>{
 
     //무선 호출명 빈 문자열 검증
     if (!streamingName) {
-        alert('Please enter a valid RTSP URL');
+        alert('무선호출명을 입력해주세요');
         return;
     }
 
@@ -191,7 +192,7 @@ const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraCo
         //WebRTC 피어에 무선호출명 객체를 추가해 중복 호출 방지
         webRtcPeer[streamUUID].__proto__.streamingName = streamingName;
     }else{
-        return;
+        alert("중복")
     }
 }
 
@@ -212,6 +213,7 @@ const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID, id, p
         streamUUID : streamUUID,
         cameraCode : cameraCode
     }
+    console.log(message)
     sendMessage("viewer", message)
 }
 
@@ -270,7 +272,7 @@ const onError = (error) => {
 }
 
 //ptz 컨트롤 api를 호출하는 함수
-const ptzStart = (e) =>{
+const ptzStart = async (e) =>{
     //console.log(data)
     isMouseDown = true
     if(isMouseDown){
@@ -278,7 +280,7 @@ const ptzStart = (e) =>{
         if(!data){
             return
         }
-        axios.get('/api/ptz',{
+        await axios.get('/api/ptz',{
             params :{
                 streamingName : data.streaming_name,
                 id : data.streaming_id,
@@ -287,6 +289,10 @@ const ptzStart = (e) =>{
                 ptzEvent : e.getAttribute("id"),
                 ptzSpeed : 50
             }
+        }).then(response =>{
+            console.log(response.data)
+        }).catch(error =>{
+            console.log(error)
         })
     }
 }
@@ -358,4 +364,4 @@ socket.on('viewerResponse', viewerResponseHandler);
 socket.on('iceCandidate', iceCandidateHandler);
 
 //websocket rtcConnect 응답 처리
-socket.on('rtcConnectResponse', rtcConnectResponseHnadler);
+socket.on('rtcConnectResponse', rtcConnectResponseHandler);

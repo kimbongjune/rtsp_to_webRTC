@@ -104,7 +104,7 @@ $(document).ready(async function () {
         .then(function(response) {
             // 여기에서 response.data를 처리합니다.
             //console.log(response)
-            const rtspData = response.data;
+            const rtspData = response.data.data;
             const tableBody = document.getElementById('rtsp_table').getElementsByTagName('tbody')[0];
                 rtspData.forEach(item => {
                 const row = tableBody.insertRow();

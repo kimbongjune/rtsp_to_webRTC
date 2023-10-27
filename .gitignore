@@ -1,7 +1,9 @@
 /node_modules
+/node_modules_back
 /ffmpeg
 /install
 /keys
 /static/bower_components
 /static/recorders
 /static/decodeTest
+server_back.js

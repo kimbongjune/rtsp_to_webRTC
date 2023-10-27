@@ -65,12 +65,12 @@ const rtspTable = sequelize.define(TABLE_NAME, {
     streaming_id: {
         type: DataTypes.STRING,
         allowNull: false,
-        comment : "카메라 게정 아이디"
+        comment : "카메라 계정 아이디"
     },
     streaming_password: {
         type: DataTypes.STRING,
         allowNull: false,
-        comment : "카메라 게정 비밀번호"
+        comment : "카메라 계정 비밀번호"
     },
     camera_type: {
         type: DataTypes.STRING,

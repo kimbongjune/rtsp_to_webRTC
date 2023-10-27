@@ -37,12 +37,18 @@ const { v4: uuidv4 } = require('uuid');
 const {Base64, hex_md5} = require('./static/js/base64');
 const { default: axios } = require('axios');
 const FormData = require('form-data');
+const dotenv = require('dotenv').config();
+const crypto = require('crypto');
 
 //npm 아규먼트
+const WEBSERVER_PORT = process.env.WEBSERVER_PORT
+const KURENTO_PORT = process.env.KURENTO_PORT
+const RTSP_PORT = process.env.RTSP_PORT
+
 var argv = minimist(process.argv.slice(2), {
     default: {
-        as_uri: 'http://localhost:8443/',
-        ws_uri: 'ws://localhost:8888/kurento'
+        as_uri: `http://192.168.10.68.44:${WEBSERVER_PORT}/`,
+        ws_uri: `ws://192.168.10.68:${KURENTO_PORT}/kurento`
     }
 });
 
@@ -72,9 +78,6 @@ app.use('/api', apiRoute);
 //라우팅 설정 /manage
 app.use('/manage', manageRoute);
 
-//RTSP 포트
-//const RTSP_PORT = 554 //운영용 포트
-const RTSP_PORT = 1935  //테스트용 포트
 
 //express 서버 인스턴스 생성
 const server = http.createServer(app);
@@ -106,7 +109,9 @@ server.listen(port, function() {
 
 //소켓 메시지 전송 공통함수
 const sendMessage = (socket, id, message) =>{
-    socket.emit(id, message);
+    //console.log(socket.request.headers.referer)
+    //socket.emit(id, message);
+    io.to(socket.id).emit(id, message);
 }
 
 //ICE Candidate 후보군을 관리하는 객체
@@ -154,6 +159,7 @@ const checkTCPConnection = async (ip, port) => {
 //헬스체크 API
 app.get('/health-check', async (req, res) => {
     let carIdDataArray = req.query.carId;
+    console.log(carIdDataArray)
     if (!carIdDataArray) {
         return res.status(400).send({response : "error", message: "필수 파라미터(carId) 누락" });
     }
@@ -177,7 +183,6 @@ app.get('/health-check', async (req, res) => {
             //console.log(found)
             if (found) {
                 const connectionResult = await checkTCPConnection(found.streaming_ip, RTSP_PORT);
-                console.log(connectionResult)
                 return {
                     ...found.dataValues,
                     status: connectionResult.status,
@@ -189,7 +194,7 @@ app.get('/health-check', async (req, res) => {
             }
         }));
 
-        res.json(checkedResponses);
+        res.status(200).json({response : "success", result : checkedResponses});
         
     } catch (error) {
         res.status(500).json({response : "error", message: error.message });
@@ -209,8 +214,11 @@ sequelize.sync()
 io.on('connection', (socket) => {
     //websocket rtcConnect 응답 처리 리스너, 무선호출명을 파라미터로 받아 데이터베이스를 조회하고 tcp 헬스체크를 진행함. 성공시 고유 UUID를 반환함.
     socket.on("rtcConnect", async(data) =>{
+        data = data.streamingName != undefined ? data : JSON.parse(data)
+        console.log(data)
         try {
             const streamingName = data.streamingName
+            console.log(streamingName)
             if(streamingName === "" || !streamingName){
                 const message = {
                     response: 'error',
@@ -234,6 +242,7 @@ io.on('connection', (socket) => {
 
             const rtspIP = selectResult.dataValues.streaming_ip;
             const healthCheckResult = await checkTCPConnection(rtspIP, RTSP_PORT);
+            console.log(healthCheckResult)
 
             if(!healthCheckResult.isOpen) {
                 const message = {
@@ -243,10 +252,9 @@ io.on('connection', (socket) => {
                 sendMessage(socket, 'rtcConnectResponse', message)
                 return;
             }
-            // 이노뎁 /nvrcgi/system/GetAuthenticationid
-            //TODO 이노뎁, 세연 인포테크 등 인증 로직 추가 및 url 확인
             const cameraCode = selectResult.dataValues.camera_code
-            if(cameraCode === 0){
+            if(cameraCode === 1){
+                //케다콤 ptz 파라미터 생성
                 const authData = await axios.get(`http://${rtspIP}/kdsapi/link/authenticationid`,{
                     headers : {
                         "If-Modified-Since" :"0"
@@ -263,6 +271,7 @@ io.on('connection', (socket) => {
                     );
                     selectResult.dataValues.authenticationid = authenticationid
                     selectResult.dataValues.encoded_password = encodedPassword
+                    selectResult.dataValues.ptz_possible_flag = true
                 }else{
                     const message = {
                         response: 'error',
@@ -271,10 +280,136 @@ io.on('connection', (socket) => {
                     sendMessage(socket, 'rtcConnectResponse', message)
                     return;
                 }
-            }
+            }else if(cameraCode === 2){
+                //이노뎁
+                const authData = await axios.get(`http://${rtspIP}/nvrcgi/system/GetAuthenticationid`,{
+                    headers : {
+                        "If-Modified-Since" :"0"
+                    }
+                })
 
-            //이노뎁 nvrcgi/system/GetAuthenticationid <authenticationinfo type="7.0"><username>admin</username><password>ZDdmMjFhOTU0MTNlNjRiZWZmZTMwODUxMmZjNGUxNDU=</password><authenticationid>569005199c00b5</authenticationid></authenticationinfo>
-            //이후 nvrcgi/system/Login <contentroot><authenticationinfo type="7.0"><username>admin</username><password>ZmY3NWY2NmJkMWJlN2RiMGU3MjRlNDA3M2I3NGY0Y2M=</password><authenticationid>569002199b948a</authenticationid></authenticationinfo><LoginReq/></contentroot>
+                const regex = authData.data.match(/<Authenticationid>(.*?)<\/Authenticationid>/)
+                if(regex && regex[1]){
+                    const authenticationid = regex[1]
+                    const steramingId = selectResult.dataValues.streaming_id
+                    const streamingPassword = selectResult.dataValues.streaming_password
+                    const encodedPassword = Base64.encode(
+                        hex_md5(steramingId + "," + streamingPassword + "," + authenticationid)
+                    );
+
+                    let loginData = "<contentroot>"
+                    loginData += '<authenticationinfo type="7.0">';
+                    loginData += "<username>" + steramingId + "</username>";
+                    loginData += "<password>" + encodedPassword + "</password>";
+                    loginData += "<authenticationid>" + authenticationid + "</authenticationid>";
+                    loginData += "</authenticationinfo>";
+                    loginData += "<LoginReq></LoginReq></contentroot>"
+
+                    await axios.post(`http://${rtspIP}/nvrcgi/system/Login`,loginData, {
+                        headers : {
+                            "If-Modified-Since" :"0",
+                            'Content-Type': 'application/xml'
+                        }
+                    })
+
+                    //console.log(loginResponseData)
+                    
+                    selectResult.dataValues.authenticationid = authenticationid
+                    selectResult.dataValues.encoded_password = encodedPassword
+                    selectResult.dataValues.ptz_possible_flag = true
+                }else{
+                    const message = {
+                        response: 'error',
+                        message: `${streamingName} 차량의 카메라 계정인증 실패`
+                    }
+                    sendMessage(socket, 'rtcConnectResponse', message)
+                    return;
+                }
+            }else if(cameraCode === 3){
+                //세연
+                selectResult.dataValues.ptz_possible_flag = false
+                // try {
+                //     const uri = `http://${rtspIP}/app/multi/single.asp`
+                //     const authData = await axios.get(uri, {
+                //         validateStatus : (status) =>{
+                //             return status >= 200 || status < 500
+                //         }
+                //     })
+                //     const digestHeader = authData.headers['www-authenticate']
+                //     console.log(digestHeader)
+                //     if(digestHeader){
+                //         const steramingId = selectResult.dataValues.streaming_id
+                //         const streamingPassword = selectResult.dataValues.streaming_password
+                //         const realm = /realm="([^"]+)"/.exec(digestHeader)[1]
+                //         const opaque = /qop="([^"]+)"/.exec(digestHeader)[1]
+                //         const nonce = /nonce="([^"]+)"/.exec(digestHeader)[1]
+                //         const nc = "00000001"
+                //         const algorithm = "MD5"
+                //         const qop = "auth"
+                //         const cnone = crypto.randomBytes(16).toString("hex")
+                //         const ha1 = crypto.createHash("md5").update(`${steramingId}:${realm}:${streamingPassword}`).digest("hex")
+                //         const ha2 = crypto.createHash("md5").update(`GET:/app/multi/single.asp`).digest("hex")
+                //         const response = crypto.createHash("md5").update(`${ha1}:${nonce}:${nc}:${cnone}:${opaque}:${ha2}`).digest("hex")
+                //         const authorizationHeader = `Digest username="${steramingId}", realm="${realm}", nonce="${nonce}", uri="/app/multi/single.asp", algorithm="${algorithm}", response="${response}", opaque="${opaque}", qop="${qop}", nc="${nc}", cnonce="${cnone}"`
+                //         const loginUri = `http://${rtspIP}/app/multi/single.asp`
+                //         const loginAuthData = await axios.get(loginUri, {
+                //             headers : {
+                //                 "Authorization" :authorizationHeader,
+                //                 "Accept" : "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+                //             },
+                //             validateStatus : (status) =>{
+                //                 return status >= 200 || status < 500
+                //             }
+                //         })
+                //         console.log("@@@@@@@@@@@@@@@@",loginAuthData)
+                //         selectResult.dataValues.authenticationid = authorizationHeader
+                //         selectResult.dataValues.ptz_possible_flag = true
+                //     }else{
+                //         const message = {
+                //             response: 'error',
+                //             message: `${streamingName} 차량의 카메라 계정인증 실패`
+                //         }
+                //         sendMessage(socket, 'rtcConnectResponse', message)
+                //         return;
+                //     }
+                //     //다이제스트 인증
+                // } catch (error) {
+                //     console.log(error)    
+                // }
+                
+            }else if(cameraCode === 4){
+                //인포스텍
+                selectResult.dataValues.ptz_possible_flag = false
+                // try {
+                //     //{"method":"global.login","params":{"userName":"admin","password":"","clientType":"Web3.0","loginType":"Direct"},"id":1}
+                //     const steramingId = selectResult.dataValues.streaming_id
+                //     const data = {
+                //         method : "global.login",
+                //         params : {
+                //             userName : steramingId,
+                //             password : "",
+                //             clientType : "Web3.0",
+                //             loginType : "Direct"
+                //         },
+                //         id : 1
+                //     }
+                //     const uri = `http://${rtspIP}/RPC2_Login`
+                //     const authData = await axios.post(uri, data, {
+                //         validateStatus : (status) =>{
+                //             return status >= 200 || status < 500
+                //         }
+                //     })
+                //     console.log(authData.data.params)
+                // }catch(error){
+                //     console.log(error)
+                // }
+            }else if(cameraCode === 5){
+                //히트론
+                selectResult.dataValues.ptz_possible_flag = false
+            }else{
+                //미 정의 코드
+                selectResult.dataValues.ptz_possible_flag = false
+            }
 
             const streamUUID = uuidv4();
             selectResult.dataValues.streamUUID = streamUUID
@@ -297,14 +432,14 @@ io.on('connection', (socket) => {
     //websocket viewer 응답 처리 리스너, rtsp 영상을 쿠렌토 미디어 서버를 이용해 webRTC로 변환함
     socket.on('viewer', async (data) => {
         try {
-            //console.log(data)
+            data = data.streamingName != undefined ? data : JSON.parse(data)
             const streamUUID = data.streamUUID
             const streamingName = data.streamingName
             if(streamingName === "" || !streamingName){
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (streamingName) 누락`,
-                    streamUUID : data.streamUUID
+                    streamUUID : streamUUID
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -316,7 +451,7 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (rtspIp) 누락`,
-                    streamUUID : data.streamUUID
+                    streamUUID : streamUUID
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -328,7 +463,7 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (disasterNumber) 누락`,
-                    streamUUID : data.streamUUID
+                    streamUUID : streamUUID
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -340,7 +475,7 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (carNumber) 누락`,
-                    streamUUID : data.streamUUID
+                    streamUUID : streamUUID
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -352,7 +487,7 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (streamingId) 누락`,
-                    streamUUID : data.streamUUID
+                    streamUUID : streamUUID
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -364,31 +499,41 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (streamingPassword) 누락`,
-                    streamUUID : data.streamUUID
+                    streamUUID : streamUUID
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
             }
 
             const cameraCode = data.cameraCode
+            console.log(cameraCode)
 
             if(cameraCode === "" || !cameraCode){
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (cameraCode) 누락`,
-                    streamUUID : data.streamUUID
+                    streamUUID : streamUUID
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
             }
             const rtspUrl = generateRtspEndpoint(rtspIp, streamingId, streamingPassword, cameraCode)
+            if(rtspUrl === "error"){
+                const message = {
+                    response: 'error',
+                    message: "차량 카메라코드가 정의되어있지 않음",
+                    streamUUID : streamUUID
+                }
+                sendMessage(socket, 'viewerResponse', message)
+            }
             const sdpOffer = data.sdpOffer
             //영상 변환 시작
             startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carNumber, streamingName, function(error, sdpAnswer) {
                 if(error) {
                     const message = {
                         response: 'error',
-                        message: error
+                        message: error,
+                        streamUUID : streamUUID
                     }
                     sendMessage(socket, 'viewerResponse', message)
                 } else {
@@ -412,13 +557,14 @@ io.on('connection', (socket) => {
 
     //websocket stop 응답 처리 리스너, webRTC peer와 미디어서버 인스턴스, recorder 연결을 정리함
     socket.on('stop', (data) => {
-        console.log(data)
+        data = data.streamUUID != undefined ? data : JSON.parse(data)
         const streamUUID = data.streamUUID
         stop(streamUUID);
     });
 
     //websocket onIceCandidate 응답 처리 리스너, 클라이언트에서 전송한 ICE Candidate 후보군을 서버에 추가
     socket.on('onIceCandidate', (data) => {
+        data = data.streamUUID != undefined ? data : JSON.parse(data)
         const streamUUID = data.streamUUID
         const candidate = data.candidate
         onIceCandidate(streamUUID, candidate);
@@ -426,7 +572,7 @@ io.on('connection', (socket) => {
 });
 
 
-//쿠렌토 미디어서버 인스턴스를 생성하는 함수(싱글톤)
+//쿠렌토 미디어서버 인스턴스를 생성하는 함수
 function getKurentoClient(callback) {
     if (kurentoClient !== null) {
         return callback(null, kurentoClient);
@@ -493,6 +639,15 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carN
                             streamUUID : streamUUID
                         }
                         sendMessage(socket, 'iceCandidate', message)
+                    });
+
+
+                    webRtcEndpoint.on('IceComponentStateChanged', function(event) { 
+                        console.log("IceComponentStateChanged",event)
+                        if(event.state === "FAILED"){
+                            stop(streamUUID);
+                            return callback("ice 연결 실패 다시 시도해주세요");
+                        }
                     });
 
                     //영상을 녹화하며, 저장하기위한 디렉토리 설정
@@ -659,15 +814,20 @@ function generateRtspEndpoint(rtspIp, id, password, cameraCode){
     //특이 : 이노뎁의 김해동부-북부(펌프차_97거0144) (172.16.44.10) 인포스텍이랑 동일
     //chanel은 0이 기본값 stream은 1이 기본값
     //"rtsp://"+s.ip+":"+a.Port+"/cam/realmonitor?channel="+(s.channel+1)+"&subtype="+(s.stream-1)
-    if(cameraCode === 0){
-        return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/id=0`
-    }else if(cameraCode === 1){
+    //TODO : 5번 다시 확인 해봐야함
+    if(cameraCode === 1){
         return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/id=0`
     }else if(cameraCode === 2){
-        return ""
+        return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/id=0`
     }else if(cameraCode === 3){
         return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/cam0_0`
-    }else{
+    }else if(cameraCode === 4){
+        return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/cam/realmonitor?channel=1&subtype=0`
+    }else if(cameraCode === 5){
+        return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/id=0`
+    }else if(cameraCode === 6){
         return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/live/cctv001.stream`
+    }else{
+        return `error`
     }
 }

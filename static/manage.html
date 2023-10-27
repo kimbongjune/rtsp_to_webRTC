@@ -138,10 +138,15 @@
             </div>
             <div class="modal-body">
               <!-- Form removed as per requirement -->
+              <div class="mb-3 row">
+                <div class="col-sm-8">
+                  <input type="hidden" class="form-control" id="streaming_name_modify_before" readonly>
+                </div>
+              </div>
                 <div class="mb-3 row">
                   <label for="streaming_name_modify" class="col-sm-4 col-form-label">무선 호출명</label>
                   <div class="col-sm-8">
-                    <input type="text" class="form-control" id="streaming_name_modify" readonly>
+                    <input type="text" class="form-control" id="streaming_name_modify">
                   </div>
                 </div>
                 <div class="mb-3 row">
@@ -393,6 +398,7 @@ $(document).ready(async function () {
                 return alert("행을 선택 후 수정이 가능합니다.")
             }
 
+            const streaming_name_modify_before = document.getElementById("streaming_name_modify_before");
             const streaming_name = document.getElementById("streaming_name_modify");
             const streaming_car_id = document.getElementById("streaming_car_id_modify");
             const streaming_ip = document.getElementById("streaming_ip_modify");
@@ -404,6 +410,7 @@ $(document).ready(async function () {
             const data = table.row('.selected').data()
             console.log(data)
 
+            streaming_name_modify_before.value = data[0]
             streaming_name.value = data[0]
             streaming_car_id.value = data[1]
             streaming_ip.value = data[2]
@@ -417,6 +424,7 @@ $(document).ready(async function () {
         })
 
         document.getElementById("modify-rtsp-info").addEventListener("click", async function(){
+            const streaming_name_modify_before = document.getElementById("streaming_name_modify_before");
             const streaming_name = document.getElementById("streaming_name_modify");
             const streaming_car_id = document.getElementById("streaming_car_id_modify");
             const streaming_ip = document.getElementById("streaming_ip_modify");
@@ -441,6 +449,7 @@ $(document).ready(async function () {
             }
 
             const data = {
+                before_streaming_name : streaming_name_modify_before.value,
                 streaming_name: streaming_name.value,
                 streaming_car_id: streaming_car_id.value,
                 streaming_ip: streaming_ip.value,

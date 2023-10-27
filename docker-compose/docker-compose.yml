@@ -4,9 +4,15 @@ services:
   kurento:
     image: preinstalled-curento-media-server:latest
     ports:
-      - "${KURENTO_PORT}:8888"
+      - "172.16.201.44:${KURENTO_PORT}:8888/tcp"
+      - "5000-5300:5000-5300/tcp"
     volumes:
       - ${KURENTO_MOUNT_VOLUME_PATH}:/recorders
+    environment:
+      KMS_EXTERNAL_IPV4: "172.16.201.44"
+      KMS_MIN_PORT: 5000
+      KMS_MAX_PORT: 5300
+      KMS_ICE_TCP: 1
 
   db:
     image: mysql:latest

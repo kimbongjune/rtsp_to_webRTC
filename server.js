@@ -47,8 +47,8 @@ const RTSP_PORT = process.env.RTSP_PORT
 
 var argv = minimist(process.argv.slice(2), {
     default: {
-        as_uri: `http://192.168.10.68.44:${WEBSERVER_PORT}/`,
-        ws_uri: `ws://192.168.10.68:${KURENTO_PORT}/kurento`
+        as_uri: `http://localhost:${WEBSERVER_PORT}/`,
+        ws_uri: `ws://localhost:${KURENTO_PORT}/kurento`
     }
 });
 
@@ -431,9 +431,10 @@ io.on('connection', (socket) => {
 
     //websocket viewer 응답 처리 리스너, rtsp 영상을 쿠렌토 미디어 서버를 이용해 webRTC로 변환함
     socket.on('viewer', async (data) => {
+        let streamUUID = null
         try {
             data = data.streamingName != undefined ? data : JSON.parse(data)
-            const streamUUID = data.streamUUID
+            streamUUID = data.streamUUID
             const streamingName = data.streamingName
             if(streamingName === "" || !streamingName){
                 const message = {
@@ -549,7 +550,8 @@ io.on('connection', (socket) => {
             console.log(error);
             const message = {
                 response: 'error',
-                message: "알 수 없는 에러 : "+error
+                message: "알 수 없는 에러 : "+error,
+                streamUUID : streamUUID
             }
             sendMessage(socket, 'viewerResponse', message)
         }
@@ -648,6 +650,28 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carN
                             stop(streamUUID);
                             return callback("ice 연결 실패 다시 시도해주세요");
                         }
+                    });
+
+                    webRtcEndpoint.on('MediaFlowInStateChanged', function(event) { 
+                        console.log("MediaFlowInStateChanged",event)
+                        if (event.state === 'NOT_FLOWING') {
+                            stop(streamUUID);
+                            return callback("송신 데이터 문제로 인해 영상이 중지되었습니다.");
+                        }
+                    });
+
+                    webRtcEndpoint.on('MediaFlowOutStateChanged', function(event) { 
+                        console.log("MediaFlowOutStateChanged",event)
+                        if (event.state === 'NOT_FLOWING') {
+                            stop(streamUUID);
+                            return callback("수신 데이터 문제로 인해 영상이 중지되었습니다.");
+                        }
+                    });
+
+                    player.on('EndOfStream', event => {
+                        console.log('EndOfStream event:', event);
+                        stop(streamUUID);
+                        return callback("영상이 종료되었습니다.");
                     });
 
                     //영상을 녹화하며, 저장하기위한 디렉토리 설정

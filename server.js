@@ -48,7 +48,7 @@ const RTSP_PORT = process.env.RTSP_PORT
 var argv = minimist(process.argv.slice(2), {
     default: {
         as_uri: `http://localhost:${WEBSERVER_PORT}/`,
-        ws_uri: `ws://localhost:${KURENTO_PORT}/kurento`
+        ws_uri: `ws://192.168.10.68:${KURENTO_PORT}/kurento`
     }
 });
 
@@ -653,7 +653,7 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carN
                     });
 
                     webRtcEndpoint.on('MediaFlowInStateChanged', function(event) { 
-                        console.log("MediaFlowInStateChanged",event)
+                        console.log("MediaFlowInStateChanged : ",event)
                         if (event.state === 'NOT_FLOWING') {
                             stop(streamUUID);
                             return callback("송신 데이터 문제로 인해 영상이 중지되었습니다.");
@@ -661,7 +661,7 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carN
                     });
 
                     webRtcEndpoint.on('MediaFlowOutStateChanged', function(event) { 
-                        console.log("MediaFlowOutStateChanged",event)
+                        console.log("MediaFlowOutStateChanged : ",event)
                         if (event.state === 'NOT_FLOWING') {
                             stop(streamUUID);
                             return callback("수신 데이터 문제로 인해 영상이 중지되었습니다.");
@@ -669,7 +669,7 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carN
                     });
 
                     player.on('EndOfStream', event => {
-                        console.log('EndOfStream event:', event);
+                        console.log('EndOfStream :', event);
                         stop(streamUUID);
                         return callback("영상이 종료되었습니다.");
                     });

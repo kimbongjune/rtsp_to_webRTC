@@ -36,7 +36,19 @@ const sendMessage = (id, message) =>{
 }
 
 //html 로딩 완료 이벤트
-window.onload = () => {
+window.onload = async () => {
+
+    const carList = await axios.get('/api/rtsp-info')
+    
+    const availableTags = carList.data.map(item => item.streaming_name);
+      $("#streaming_name").autocomplete({
+        source: availableTags,
+        select: function(event, ui) {
+          $("#streaming_name").val(ui.item.value);
+          return false;
+        }
+    });
+
     video = document.getElementById('video');
 
     document.getElementById('viewer').addEventListener('click', function() { 

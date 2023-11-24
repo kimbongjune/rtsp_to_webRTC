@@ -22,7 +22,7 @@
 //소켓 서버와 연결 초기화
 let socket = io.connect(location.host);
 //비디오 엘리먼트를 위한 변수
-let video;
+//let video;
 //여러 WebRTC 피어를 관리할 객체
 let webRtcPeer = {}
 //영상 관련 데이터를 관리할 객체
@@ -35,59 +35,87 @@ const sendMessage = (id, message) =>{
     socket.emit(id, message);
 }
 
-//html 로딩 완료 이벤트
-window.onload = async () => {
+//
+const initializeEventListeners =() => {
+    initializeGroup('first');
+    initializeGroup('second');
+    initializeGroup('third');
+    initializeGroup('fourth');
+}
 
-    const carList = await axios.get('/api/rtsp-info')
-    
-    const availableTags = carList.data.map(item => item.streaming_name);
-      $("#streaming_name").autocomplete({
-        source: availableTags,
-        select: function(event, ui) {
-          $("#streaming_name").val(ui.item.value);
-          return false;
-        }
+const initializeGroup = (groupId) => {
+    document.getElementById("viewer-" + groupId).addEventListener('click', () => { 
+        rtcConnect(groupId); // 해당 비디오 그룹에 대한 RTC 연결 시작
     });
 
-    video = document.getElementById('video');
-
-    document.getElementById('viewer').addEventListener('click', function() { 
-        rtcConnect();   //RTC 연결 시작
-    });
-
-    document.getElementById('terminate').addEventListener('click', function() { 
+    document.getElementById("terminate-" + groupId).addEventListener('click', () => { 
         const uuid = this.getAttribute('data-uuid');
         if(uuid) {
-            stop(uuid); //연결 종료
+            stop(uuid, groupId); // 해당 비디오 그룹에 대한 연결 종료
         }
     });
 
-    document.getElementById('capture').addEventListener('click', function() { 
-        const video = document.getElementById('video');
+    document.getElementById("capture-" + groupId).addEventListener('click', () => { 
+        captureImage(groupId); // 해당 비디오 그룹에 대한 스냅샷 캡처
+    });
 
-        if(!video.paused){
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-
-            const data = cameraData[document.getElementById("streaming_name").value]
-    
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-        
-            const dataURL = canvas.toDataURL('image/png');
-        
-            const a = document.createElement('a');
-            a.href = dataURL;
-            a.download = `${getFormattedDate()}_${data?.streaming_car_id}_${data?.streamUUID}.png`
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            canvas.remove();
+    socket.on("rtcConnectResponse-"+groupId, (data) => {
+        console.log("@@@@@@@", groupId)
+        if(data.response === "success"){
+            console.log("data!!",data)
+            if(!cameraData[data.result.streaming_name]){
+                cameraData[data.result.streaming_name] = data.result
+            }
+            console.log(document.getElementById('terminate-'+groupId))
+            document.getElementById('terminate-'+groupId).setAttribute('data-uuid', data.result.streamUUID);
+            viewer(data.result.streamUUID, data.result.streaming_ip, data.result.streaming_name, data.result.streaming_id, data.result.streaming_password, data.result.streaming_car_id, data.result.camera_code, groupId)
         }else{
-            console.log("비디오 없음")
+            console.log(data)
+            return;
         }
     });
+
+    socket.on("viewerResponse-"+groupId, (message) =>{
+        if (message.response === 'success') {   
+            //정상 연결시 sdpAnswer를 webRtcPeer에 추가하고 영상을 재생
+            webRtcPeer[message.streamUUID].processAnswer(message.sdpAnswer);
+        } else {    
+            //에러시 연결 종료
+            console.log(message)
+            stop(message.streamUUID, groupId)
+        }
+    });
+
+    socket.on("iceCandidate-"+groupId, (data) => {
+        webRtcPeer[data.streamUUID].addIceCandidate(data.candidate);
+    });
+}
+
+const captureImage = (groupId) => {
+    var video = document.getElementById('video-' + groupId);
+    if (!video.paused) {
+        var canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        var context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+
+        var dataURL = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = dataURL;
+        a.download = 'capture_' + groupId + '.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        canvas.remove();
+    }else{
+        console.log("비디오 정지")
+    }
+}
+
+//html 로딩 완료 이벤트
+window.onload = async () => {
+    initializeEventListeners()
 }
 
 //모든 피어 커넥션 종료
@@ -124,37 +152,11 @@ const iceCandidateHandler = (data) =>{
     webRtcPeer[data.streamUUID].addIceCandidate(data.candidate);
 }
 
-//websocket rtcConnect 응답 처리 핸들러
-const rtcConnectResponseHandler = (data) =>{
-    if(data.response === "success"){
-		console.log(data)
-        if(!cameraData[data.result.streaming_name]){
-            cameraData[data.result.streaming_name] = data.result
-        }
-        document.getElementById('terminate').setAttribute('data-uuid', data.result.streamUUID);
-		viewer(data.result.streamUUID, data.result.streaming_ip, data.result.streaming_name, data.result.streaming_id, data.result.streaming_password, data.result.streaming_car_id, data.result.camera_code)
-	}else{
-        console.log(data)
-        return;
-    }
-}
-
-//websocket viewerResponse 응답 처리 핸들러
-const viewerResponseHandler = (message) => {
-    if (message.response === 'success') {   
-        //정상 연결시 sdpAnswer를 webRtcPeer에 추가하고 영상을 재생
-        webRtcPeer[message.streamUUID].processAnswer(message.sdpAnswer);
-    } else {    
-        //에러시 연결 종료
-        console.log(message)
-        stop(message.streamUUID)
-    }
-}
-
 //RTC 연결 요청 함수
-const rtcConnect = () =>{
+const rtcConnect = (groupId) =>{
+    console.log("@@@@@@@@@@@@@@@@",groupId)
     //중복 연결 방지
-    const streamingName = document.getElementById("streaming_name").value;  //무선호출명을 파라미터로 전송
+    const streamingName = document.getElementById("streaming_name-" + groupId).value;  //무선호출명을 파라미터로 전송
     if (Object.values(webRtcPeer).some(peer => peer.streamingName === streamingName)) {
         return;
     }
@@ -162,6 +164,7 @@ const rtcConnect = () =>{
     //무선 호출명 빈 문자열 검증
     if (!streamingName) {
         alert('무선호출명을 입력해주세요');
+        document.getElementById("streaming_name-" + groupId).focus()
         return;
     }
 
@@ -169,17 +172,21 @@ const rtcConnect = () =>{
     if (!socket.connected) {
         socket.connect();
     }
-    
+
     const message = {
-        streamingName: streamingName
+        streamingName: streamingName,
+        groupId : groupId
     }
+    console.log("?????")
     sendMessage("rtcConnect", message)
+
 }
 
 //webRTC 연결 설정 함수
-const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraCode) => {
+const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraCode, groupId) => {
     //중복 연결 방지
     if (!webRtcPeer[streamUUID]) {
+        const video = document.getElementById("video-" + groupId)
         showSpinner(video);
 
         //소켓 연결 확인 및 재연결
@@ -190,26 +197,26 @@ const viewer = (streamUUID, rtspIp, streamingName, id, password, carId, cameraCo
         //영상을 응답받을 비디오 엘리먼트와 ICE Candidate 처리 이벤트 리스너 등록
         const options = {
             remoteVideo: video,
-            onicecandidate: (candidate) => onIceCandidate(candidate, streamUUID)
+            onicecandidate: (candidate) => onIceCandidate(candidate, streamUUID, groupId)
         }
 
         //서버에서 발급받은 streamUUID를 이용해 WebRTC 피어생성(영상 수신 전용)
-        webRtcPeer[streamUUID] = kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(options, function(error) {
+        webRtcPeer[streamUUID] = kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(options, (error) => {
             if (error) return onError(error);
 
             //offer 생성
-            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraCode));
+            this.generateOffer((error, offerSdp) => onOfferViewer(error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraCode, groupId));
         });
 
         //WebRTC 피어에 무선호출명 객체를 추가해 중복 호출 방지
         webRtcPeer[streamUUID].__proto__.streamingName = streamingName;
     }else{
-        alert("중복")
+        //alert("중복")
     }
 }
 
 //offer를 서버에 전송
-const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraCode) => {
+const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID, id, password, carId, cameraCode, groupId) => {
     if (error) {
         return onError(error);
     }
@@ -223,41 +230,47 @@ const onOfferViewer = (error, offerSdp, rtspIp, streamingName, streamUUID, id, p
         streamingId : id,
         streamingPassword : password,
         streamUUID : streamUUID,
-        cameraCode : cameraCode
+        cameraCode : cameraCode,
+        groupId : groupId
     }
     console.log(message)
     sendMessage("viewer", message)
 }
 
 //ICE Candidate 처리 이벤트 리스너
-const onIceCandidate = (candidate, streamUUID) => {
+const onIceCandidate = (candidate, streamUUID, groupId) => {
     const message = {
         candidate: candidate,
-        streamUUID : streamUUID
+        streamUUID : streamUUID,
+        groupId : groupId
     }
     sendMessage("onIceCandidate", message)
 }
 
 //연결 종료 함수
-const stop = (streamUUID) => {
+const stop = (streamUUID, groupId) => {
     console.log("Stopping stream with UUID:", streamUUID);
+    console.log("Stopping stream with groupId:", groupId);
     if (webRtcPeer[streamUUID]) {
         const message = {
-            streamUUID: streamUUID
+            streamUUID: streamUUID,
+            groupId : groupId
         };
         sendMessage("stop", message);
-        dispose(streamUUID);
+        dispose(streamUUID, groupId);
     }
 }
 
 //WebRTC 피어 및 소켓 정리 함수
-const dispose = (streamUUID) => {
+const dispose = (streamUUID, groupId) => {
+    console.log("Stopping stream with UUID:", streamUUID);
+    console.log("Stopping stream with groupId:", groupId);
     if (webRtcPeer[streamUUID]) {
         delete cameraData[webRtcPeer[streamUUID].streamingName]
         webRtcPeer[streamUUID].dispose();
         delete webRtcPeer[streamUUID];
     }
-    socket?.disconnect();
+    const video = document.getElementById("video-"+groupId)
     hideSpinner(video);
 }
 
@@ -287,8 +300,9 @@ const onError = (error) => {
 const ptzStart = async (e) =>{
     //console.log(data)
     isMouseDown = true
+    const [id, groupId] = e.getAttribute("id").split("-")
     if(isMouseDown){
-        const data = cameraData[document.getElementById("streaming_name").value]
+        const data = cameraData[document.getElementById("streaming_name-"+groupId).value]
         if(!data){
             return
         }
@@ -298,7 +312,7 @@ const ptzStart = async (e) =>{
                 id : data.streaming_id,
                 password : data.encoded_password,
                 authId : data.authenticationid,
-                ptzEvent : e.getAttribute("id"),
+                ptzEvent : id,
                 ptzSpeed : 50
             }
         }).then(response =>{
@@ -311,7 +325,8 @@ const ptzStart = async (e) =>{
 
 //ptz 프리셋 api를 호출하는 함수
 const presetLoad = (e) =>{
-    const data = cameraData[document.getElementById("streaming_name").value]
+    const [id, groupId] = e.getAttribute("id").split("-")
+    const data = cameraData[document.getElementById("streaming_name-"+groupId).value]
     if(!data){
         return
     }
@@ -329,7 +344,8 @@ const presetLoad = (e) =>{
 //ptz 중지 api를 호출하는 함수
 const ptzStop = (e) =>{
     if(isMouseDown){
-        const data = cameraData[document.getElementById("streaming_name").value]
+        const [id, groupId] = e.getAttribute("id").split("-")
+        const data = cameraData[document.getElementById("streaming_name-"+groupId).value]
         if(!data){
             return
         }
@@ -347,7 +363,7 @@ const ptzStop = (e) =>{
 }
 
 //현재 날짜를 특정 포맷으로 변환하는 함수(yyyy_mm_dd-HH-MM-ss)
-function getFormattedDate() {
+const getFormattedDate = ()  =>{
     const currentDate = new Date();
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // 1~12
@@ -368,12 +384,3 @@ socket.on('connect_error', socketConnectionErrorHandler);
 
 //websocket 연결 종료
 socket.on('disconnect', socketDisconnectHandler);
-
-//websocket viewerResponse 응답 처리
-socket.on('viewerResponse', viewerResponseHandler);
-
-//websocket ICE Candidate 응답 처리
-socket.on('iceCandidate', iceCandidateHandler);
-
-//websocket rtcConnect 응답 처리
-socket.on('rtcConnectResponse', rtcConnectResponseHandler);

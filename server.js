@@ -85,7 +85,7 @@ const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
         origin: allowedOrigins,
-        credentials: true
+        credentials: false
     }
 });
 
@@ -216,13 +216,15 @@ io.on('connection', (socket) => {
     socket.on("rtcConnect", async(data) =>{
         data = data.streamingName != undefined ? data : JSON.parse(data)
         console.log(data)
+        const groupId = data.groupId
         try {
             const streamingName = data.streamingName
             console.log(streamingName)
             if(streamingName === "" || !streamingName){
                 const message = {
                     response: 'error',
-                    message: `필수 파라미터 (streamingName) 누락`
+                    message: `필수 파라미터 (streamingName) 누락`,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'rtcConnectResponse', message)
                 return;
@@ -234,7 +236,8 @@ io.on('connection', (socket) => {
             if(!selectResult) {
                 const message = {
                     response: 'error',
-                    message: `${streamingName} 차량에 대한 매핑 데이터가 없음`
+                    message: `${streamingName} 차량에 대한 매핑 데이터가 없음`,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'rtcConnectResponse', message)
                 return;
@@ -247,7 +250,8 @@ io.on('connection', (socket) => {
             if(!healthCheckResult.isOpen) {
                 const message = {
                     response: 'error',
-                    message: `${streamingName} 차량의 카메라가 꺼져있음`
+                    message: `${streamingName} 차량의 카메라가 꺼져있음`,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'rtcConnectResponse', message)
                 return;
@@ -275,7 +279,8 @@ io.on('connection', (socket) => {
                 }else{
                     const message = {
                         response: 'error',
-                        message: `${streamingName} 차량의 카메라 계정인증 실패`
+                        message: `${streamingName} 차량의 카메라 계정인증 실패`,
+                        groupId : groupId
                     }
                     sendMessage(socket, 'rtcConnectResponse', message)
                     return;
@@ -320,7 +325,8 @@ io.on('connection', (socket) => {
                 }else{
                     const message = {
                         response: 'error',
-                        message: `${streamingName} 차량의 카메라 계정인증 실패`
+                        message: `${streamingName} 차량의 카메라 계정인증 실패`,
+                        groupId : groupId
                     }
                     sendMessage(socket, 'rtcConnectResponse', message)
                     return;
@@ -413,17 +419,19 @@ io.on('connection', (socket) => {
 
             const streamUUID = uuidv4();
             selectResult.dataValues.streamUUID = streamUUID
-            
+            selectResult.dataValues.groupId = groupId
             const message = {
                 response: 'success',
                 message: "차량 연결 성공",
                 result : selectResult.dataValues
             }
+            console.log("?????")
             sendMessage(socket, 'rtcConnectResponse', message)
         }catch(error){
             const message = {
                 response: 'error',
-                message: "알 수 없는 에러 :"+error
+                message: "알 수 없는 에러 :"+error,
+                groupId : groupId
             }
             sendMessage(socket, 'rtcConnectResponse', message)
         }
@@ -432,15 +440,19 @@ io.on('connection', (socket) => {
     //websocket viewer 응답 처리 리스너, rtsp 영상을 쿠렌토 미디어 서버를 이용해 webRTC로 변환함
     socket.on('viewer', async (data) => {
         let streamUUID = null
+        let groupId = null
+        console.log("viewer", data)
         try {
             data = data.streamingName != undefined ? data : JSON.parse(data)
             streamUUID = data.streamUUID
+            groupId = data.groupId
             const streamingName = data.streamingName
             if(streamingName === "" || !streamingName){
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (streamingName) 누락`,
-                    streamUUID : streamUUID
+                    streamUUID : streamUUID,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -452,7 +464,8 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (rtspIp) 누락`,
-                    streamUUID : streamUUID
+                    streamUUID : streamUUID,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -464,7 +477,8 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (disasterNumber) 누락`,
-                    streamUUID : streamUUID
+                    streamUUID : streamUUID,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -476,7 +490,8 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (carNumber) 누락`,
-                    streamUUID : streamUUID
+                    streamUUID : streamUUID,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -488,7 +503,8 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (streamingId) 누락`,
-                    streamUUID : streamUUID
+                    streamUUID : streamUUID,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -500,7 +516,8 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (streamingPassword) 누락`,
-                    streamUUID : streamUUID
+                    streamUUID : streamUUID,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
@@ -513,36 +530,42 @@ io.on('connection', (socket) => {
                 const message = {
                     response: 'error',
                     message: `필수 파라미터 (cameraCode) 누락`,
-                    streamUUID : streamUUID
+                    streamUUID : streamUUID,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'viewerResponse', message)
                 return;
             }
             const rtspUrl = generateRtspEndpoint(rtspIp, streamingId, streamingPassword, cameraCode)
+            console.log(rtspUrl)
             if(rtspUrl === "error"){
                 const message = {
                     response: 'error',
                     message: "차량 카메라코드가 정의되어있지 않음",
-                    streamUUID : streamUUID
+                    streamUUID : streamUUID,
+                    groupId : groupId
                 }
                 sendMessage(socket, 'viewerResponse', message)
             }
             const sdpOffer = data.sdpOffer
             //영상 변환 시작
-            startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carNumber, streamingName, function(error, sdpAnswer) {
+            startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carNumber, streamingName, groupId, function(error, sdpAnswer) {
                 if(error) {
                     const message = {
                         response: 'error',
                         message: error,
-                        streamUUID : streamUUID
+                        streamUUID : streamUUID,
+                        groupId : groupId
                     }
                     sendMessage(socket, 'viewerResponse', message)
                 } else {
                     const message = {
                         response: 'success',
                         sdpAnswer: sdpAnswer,
-                        streamUUID : streamUUID
+                        streamUUID : streamUUID,
+                        groupId : groupId
                     }
+                    console.log("startViewer success")
                     sendMessage(socket, 'viewerResponse', message)
                 }
             });
@@ -551,7 +574,8 @@ io.on('connection', (socket) => {
             const message = {
                 response: 'error',
                 message: "알 수 없는 에러 : "+error,
-                streamUUID : streamUUID
+                streamUUID : streamUUID,
+                groupId : groupId
             }
             sendMessage(socket, 'viewerResponse', message)
         }
@@ -566,6 +590,7 @@ io.on('connection', (socket) => {
 
     //websocket onIceCandidate 응답 처리 리스너, 클라이언트에서 전송한 ICE Candidate 후보군을 서버에 추가
     socket.on('onIceCandidate', (data) => {
+        //console.log("onIceCandidate",data)
         data = data.streamUUID != undefined ? data : JSON.parse(data)
         const streamUUID = data.streamUUID
         const candidate = data.candidate
@@ -593,8 +618,8 @@ function getKurentoClient(callback) {
 }
 
 //쿠렌토 미디어 서버에서 미디어 트랜스코딩 인스턴스를 시작하는 함수
-function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carNumber, streamingName, callback) {
-
+function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carNumber, streamingName, groupId, callback) {
+    console.log("Starting view")
     //ICE Candidate 후보군 정리
     clearCandidatesQueue(streamUUID);
 
@@ -638,7 +663,8 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carN
                         const candidate = kurento.getComplexType('IceCandidate')(event.candidate);
                         const message = {
                             candidate: candidate,
-                            streamUUID : streamUUID
+                            streamUUID : streamUUID,
+                            groupId : groupId
                         }
                         sendMessage(socket, 'iceCandidate', message)
                     });
@@ -647,6 +673,7 @@ function startViewer(streamUUID, socket, sdpOffer, rtspUrl, disasterNumber, carN
                     webRtcEndpoint.on('IceComponentStateChanged', function(event) { 
                         console.log("IceComponentStateChanged",event)
                         if(event.state === "FAILED"){
+                            console.log(event)
                             stop(streamUUID);
                             return callback("ice 연결 실패 다시 시도해주세요");
                         }
@@ -850,7 +877,8 @@ function generateRtspEndpoint(rtspIp, id, password, cameraCode){
     }else if(cameraCode === 5){
         return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/id=0`
     }else if(cameraCode === 6){
-        return `rtsp://${id}:${password}@${rtspIp}:${RTSP_PORT}/live/cctv001.stream`
+        console.log(`rtsp://${rtspIp}:${RTSP_PORT}/live/${password}.stream`)
+        return `rtsp://${rtspIp}:${RTSP_PORT}/live/${password}.stream`
     }else{
         return `error`
     }

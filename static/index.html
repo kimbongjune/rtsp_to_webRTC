@@ -29,36 +29,142 @@
         <div class="col-md-5">
           <div class="row">
             <div class="col-md-12">
-              <a id="viewer" href="#" class="btn btn-primary">
+              <a id="viewer-first" href="#" class="btn btn-primary">
                 <i class="bi bi-play"></i> Viewer</a>
-              <a id="terminate" href="#" class="btn btn-danger" data-uuid="">
+              <a id="terminate-first" href="#" class="btn btn-danger" data-uuid="">
                 <i class="bi bi-stop"></i> Stop</a>
-              <a id="capture" href="#" class="btn btn-success" >
+              <a id="capture-first" href="#" class="btn btn-success" >
                 <i class="bi bi-card-image"></i> capture</a><br><br>
-                <input type="text" id="streaming_name" value="">
+                <input type="text" id="streaming_name-first" value="">
             </div>
           </div>
           <br>
-          <div id="ptz-container">
-            <label class="control-label" for="control">ptz</label><br>
-            <div class="grid democonsol" id="control">
-              <button type="button" class="btn btn-outline-primary" id="move_leftup" onmousedown="ptzStart(this)" onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-left"></i></button>
-              <button type="button" class="btn btn-outline-primary" id="moveup" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up"></i></button>
-              <button type="button" class="btn btn-outline-primary" id="move_rightup" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-right"></i></button>
-              <button type="button" class="btn btn-outline-primary" id="moveleft" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-left"></i></button>
-              <button type="button" class="btn btn-outline-primary" id="preset_load" onmousedown="presetLoad(this)"><i class="bi bi-arrow-clockwise"></i></button>
-              <button type="button" class="btn btn-outline-primary" id="moveright" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-right"></i></button>
-              <button type="button" class="btn btn-outline-primary" id="move_leftdown" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-left"></i></button>
-              <button type="button" class="btn btn-outline-primary" id="movedown" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down"></i></button>
-              <button type="button" class="btn btn-outline-primary" id="move_rightdown" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-right"></i></button>
+          <div id="ptz-container-first">
+            <label class="control-label" for="control-first">ptz</label><br>
+            <div class="grid democonsol" id="control-first">
+              <button type="button" class="btn btn-outline-primary" id="move_leftup-first" onmousedown="ptzStart(this, 'first')" onmouseup="ptzStop(this, 'first')" onmouseout="ptzStop(this, 'first')"><i class="bi bi-arrow-up-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveup-first" onmousedown="ptzStart(this, 'first')"  onmouseup="ptzStop(this, 'first')" onmouseout="ptzStop(this, 'first')"><i class="bi bi-arrow-up"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightup-first" onmousedown="ptzStart(this, 'first')"  onmouseup="ptzStop(this, 'first')" onmouseout="ptzStop(this, 'first')"><i class="bi bi-arrow-up-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveleft-first" onmousedown="ptzStart(this, 'first')"  onmouseup="ptzStop(this, 'first')" onmouseout="ptzStop(this, 'first')"><i class="bi bi-arrow-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="preset_load-first" onmousedown="presetLoad(this, 'first')"><i class="bi bi-arrow-clockwise"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveright-first" onmousedown="ptzStart(this, 'first')"  onmouseup="ptzStop(this, 'first')" onmouseout="ptzStop(this, 'first')"><i class="bi bi-arrow-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_leftdown-first" onmousedown="ptzStart(this, 'first')"  onmouseup="ptzStop(this, 'first')" onmouseout="ptzStop(this, 'first')"><i class="bi bi-arrow-down-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="movedown-first" onmousedown="ptzStart(this, 'first')"  onmouseup="ptzStop(this, 'first')" onmouseout="ptzStop(this, 'first')"><i class="bi bi-arrow-down"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightdown-first" onmousedown="ptzStart(this, 'first')"  onmouseup="ptzStop(this, 'first')" onmouseout="ptzStop(this, 'first')"><i class="bi bi-arrow-down-right"></i></button>
             </div>
           </div>
-          
         </div>
-        
         <div class="col-md-7">
-          <div id="videoBig">
-            <video id="video" autoplay controls preload="auto"width="640px" height="480px" data-setup="{}"></video>
+          <div id="videoBig-first">
+            <video id="video-first" autoplay controls preload="auto"width="640px" height="480px" data-setup="{}"></video>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-5">
+          <div class="row">
+            <div class="col-md-12">
+              <a id="viewer-second" href="#" class="btn btn-primary">
+                <i class="bi bi-play"></i> Viewer</a>
+              <a id="terminate-second" href="#" class="btn btn-danger" data-uuid="">
+                <i class="bi bi-stop"></i> Stop</a>
+              <a id="capture-second" href="#" class="btn btn-success" >
+                <i class="bi bi-card-image"></i> capture</a><br><br>
+                <input type="text" id="streaming_name-second" value="">
+            </div>
+          </div>
+          <br>
+          <div id="ptz-container-second">
+            <label class="control-label" for="control-second">ptz</label><br>
+            <div class="grid democonsol" id="control-second">
+              <button type="button" class="btn btn-outline-primary" id="move_leftup-second" onmousedown="ptzStart(this)" onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveup-second" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightup-second" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveleft-second" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="preset_load-second" onmousedown="presetLoad(this)"><i class="bi bi-arrow-clockwise"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveright-second" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_leftdown-second" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="movedown-second" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightdown-second" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-right"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div id="videoBig-second">
+            <video id="video-second" autoplay controls preload="auto"width="640px" height="480px" data-setup="{}"></video>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-5">
+          <div class="row">
+            <div class="col-md-12">
+              <a id="viewer-third" href="#" class="btn btn-primary">
+                <i class="bi bi-play"></i> Viewer</a>
+              <a id="terminate-third" href="#" class="btn btn-danger" data-uuid="">
+                <i class="bi bi-stop"></i> Stop</a>
+              <a id="capture-third" href="#" class="btn btn-success" >
+                <i class="bi bi-card-image"></i> capture</a><br><br>
+                <input type="text" id="streaming_name-third" value="">
+            </div>
+          </div>
+          <br>
+          <div id="ptz-container-third">
+            <label class="control-label" for="control-third">ptz</label><br>
+            <div class="grid democonsol" id="control-third">
+              <button type="button" class="btn btn-outline-primary" id="move_leftup-third" onmousedown="ptzStart(this)" onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveup-third" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightup-third" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveleft-third" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="preset_load-third" onmousedown="presetLoad(this)"><i class="bi bi-arrow-clockwise"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveright-third" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_leftdown-third" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="movedown-third" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightdown-third" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-right"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div id="videoBig-third">
+            <video id="video-third" autoplay controls preload="auto"width="640px" height="480px" data-setup="{}"></video>
+          </div>
+        </div>
+      </div>
+      
+      <div class="row">
+        <div class="col-md-5">
+          <div class="row">
+            <div class="col-md-12">
+              <a id="viewer-fourth" href="#" class="btn btn-primary">
+                <i class="bi bi-play"></i> Viewer</a>
+              <a id="terminate-fourth" href="#" class="btn btn-danger" data-uuid="">
+                <i class="bi bi-stop"></i> Stop</a>
+              <a id="capture-fourth" href="#" class="btn btn-success" >
+                <i class="bi bi-card-image"></i> capture</a><br><br>
+                <input type="text" id="streaming_name-fourth" value="">
+            </div>
+          </div>
+          <br>
+          <div id="ptz-container-fourth">
+            <label class="control-label" for="control-fourth">ptz</label><br>
+            <div class="grid democonsol" id="control-fourth">
+              <button type="button" class="btn btn-outline-primary" id="move_leftup-fourth" onmousedown="ptzStart(this)" onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveup-fourth" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightup-fourth" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-up-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveleft-fourth" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="preset_load-fourth" onmousedown="presetLoad(this)"><i class="bi bi-arrow-clockwise"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="moveright-fourth" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-right"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_leftdown-fourth" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-left"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="movedown-fourth" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="move_rightdown-fourth" onmousedown="ptzStart(this)"  onmouseup="ptzStop(this)" onmouseout="ptzStop(this)"><i class="bi bi-arrow-down-right"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div id="videoBig-fourth">
+            <video id="video-fourth" autoplay controls preload="auto"width="640px" height="480px" data-setup="{}"></video>
           </div>
         </div>
       </div>
